@@ -7,17 +7,17 @@
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-orange)
 ![Docker](https://img.shields.io/badge/Docker-Containerization-informational)
 ![Gunicorn](https://img.shields.io/badge/Gunicorn-WSGI%20Server-success)
-![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-CI%20Deploy-2088FF)
-![Heroku](https://img.shields.io/badge/Heroku-Docker%20Deploy-79589F)
+![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-CI-2088FF)
+![GHCR](https://img.shields.io/badge/GHCR-Container%20Registry-6f42c1)
 ![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-green)
 
-PeakWhale™ Harbor is a local first valuation and forecasting demo that serves a Machine Learning (ML) model through a Flask web User Interface (UI) and a JSON Application Programming Interface (API).
+PeakWhale™ Harbor is a local first demo that serves a scikit learn regression model through a Flask web User Interface (UI) and a JSON Application Programming Interface (API).
 
-It is intentionally lightweight so you can use it as a reference for model artifact packaging, deterministic inference, and container deployment.
+The current model predicts the Boston housing target MEDV, median home value in thousands of US dollars, using the classic feature set.
 
 ## Enterprise Business Problem
 
-In real teams, model demos often fail to become usable services because:
+In real teams, demos often fail to become usable services because:
 
 * artifacts are scattered or not versioned
 * feature ordering is ambiguous at inference time
@@ -34,19 +34,42 @@ Do not treat outputs as real world pricing advice.
 
 ## What Harbor Does
 
-Harbor provides two ways to run predictions:
+Harbor provides:
 
-* UI form based prediction from a browser
+* UI based prediction from a browser
 * API based prediction from JSON requests
-
-It also includes a simple health endpoint so deployments can be monitored.
+* a health endpoint for monitoring
+* a schema endpoint that documents inputs and outputs
 
 ## App Endpoints
 
 * `/` renders the UI
 * `/health` returns a health check JSON
+* `/schema` returns model metadata and required input fields
 * `/predict` accepts HTML form posts
 * `/predict_api` accepts JSON payloads
+
+## Model Inputs
+
+Inputs are the standard Boston housing features:
+
+* `CRIM` per capita crime rate by town
+* `ZN` proportion of residential land zoned for lots over 25,000 sq ft
+* `INDUS` proportion of non retail business acres per town
+* `CHAS` Charles River dummy variable (1 if tract bounds river, else 0)
+* `NOX` nitric oxides concentration (parts per 10 million)
+* `RM` average number of rooms per dwelling
+* `AGE` proportion of owner occupied units built prior to 1940
+* `DIS` weighted distances to five Boston employment centres
+* `RAD` index of accessibility to radial highways
+* `TAX` full value property tax rate per 10,000 dollars
+* `PTRATIO` pupil teacher ratio by town
+* `B` 1000(Bk minus 0.63)^2 where Bk is the proportion of Black residents by town
+* `LSTAT` percent lower status of the population
+
+Output:
+
+* `prediction` predicted MEDV, in thousands of US dollars
 
 ## Example API Request
 
@@ -76,11 +99,11 @@ curl -X POST http://localhost:5000/predict_api \
 
 * Python 3.11+
 * Flask web server
-* scikit learn for the model and preprocessing
+* scikit learn for preprocessing and regression
 * Gunicorn Web Server Gateway Interface (WSGI) server for production
 * Docker for container builds
-* GitHub Actions for Continuous Integration (CI) deployment workflow
-* Heroku deployment via Docker image push
+* GitHub Actions for Continuous Integration (CI)
+* GitHub Container Registry (GHCR) for publishing images
 
 ## Repository Structure
 
@@ -105,7 +128,7 @@ harbor/
 
 Harbor loads two artifacts at runtime:
 
-* `artifacts/regmodel.pkl` contains the trained model
+* `artifacts/regmodel.pkl` contains the trained regression model
 * `artifacts/scaling.pkl` contains the fitted scaler
 
 Inference enforces a fixed feature order to keep predictions deterministic.
@@ -154,7 +177,7 @@ docker build -t peakwhale-harbor .
 ### Run
 
 ```bash
-docker run -p 8000:8000 -e PORT=8000 peakwhale-harbor
+docker run --name harbor -p 8000:8000 -e PORT=8000 peakwhale-harbor
 ```
 
 Open:
@@ -163,15 +186,17 @@ Open:
 http://localhost:8000
 ```
 
-## Deploy to Heroku via GitHub Actions
+## Run from GHCR
 
-This repository deploys on pushes to `main` using GitHub Actions.
+On pushes to `main`, GitHub Actions builds and publishes an image to GHCR.
 
-Required GitHub repository secrets:
+If the package is private, authenticate with a GitHub Personal Access Token (PAT) that has `read:packages` permission:
 
-* `HEROKU_EMAIL`
-* `HEROKU_API_KEY`
-* `HEROKU_APP_NAME`
+```bash
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
+docker pull ghcr.io/peakwhale/harbor:latest
+docker run --name harbor -p 8000:8000 -e PORT=8000 ghcr.io/peakwhale/harbor:latest
+```
 
 ## Why This Project Exists
 

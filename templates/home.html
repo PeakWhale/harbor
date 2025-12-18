@@ -1,50 +1,402 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{{ app_name }}</title>
     <style>
-      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; padding: 32px; }
-      .wrap { max-width: 520px; }
-      h1 { margin: 0 0 6px; font-size: 44px; }
-      p { margin: 0 0 18px; color: #444; }
-      input { width: 100%; padding: 10px 12px; margin: 6px 0; border: 1px solid #bbb; border-radius: 6px; font-size: 16px; }
-      button { margin-top: 10px; padding: 10px 14px; border: 1px solid #333; border-radius: 8px; background: #fff; font-size: 16px; cursor: pointer; }
-      .pred { margin-top: 22px; font-size: 22px; }
-      .note { margin-top: 8px; font-size: 13px; color: #666; }
+      :root{
+        --bg0:#0b0d10;
+        --bg1:#0f1217;
+        --text:#e9eef5;
+        --muted:#b3bdc9;
+        --muted2:#93a0af;
+        --border:rgba(255,255,255,0.10);
+        --border2:rgba(255,255,255,0.14);
+        --accent:#6ea8fe;
+      }
+
+      *{ box-sizing:border-box; }
+      html,body{ height:100%; }
+      body{
+        margin:0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        color:var(--text);
+        background:
+          radial-gradient(1000px 500px at 20% 0%, rgba(110,168,254,0.18), transparent 60%),
+          radial-gradient(900px 450px at 100% 20%, rgba(74,222,128,0.10), transparent 60%),
+          linear-gradient(180deg, var(--bg0), var(--bg1));
+      }
+
+      .wrap{
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 28px 18px 40px;
+      }
+
+      .header{
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        margin-bottom: 16px;
+      }
+
+      h1{
+        font-size: 56px;
+        line-height: 1.02;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+
+      .subtitle{
+        font-size: 22px;
+        color: var(--muted);
+        margin: 0;
+      }
+
+      .desc{
+        font-size: 15px;
+        color: var(--muted2);
+        max-width: 860px;
+        margin: 0;
+      }
+
+      .metaRow{
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px;
+        align-items:center;
+        margin-top: 4px;
+      }
+
+      .pill{
+        display:inline-flex;
+        gap:8px;
+        align-items:center;
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        background: rgba(0,0,0,0.20);
+        border-radius: 999px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .pill a{
+        color: var(--text);
+        text-decoration: none;
+        border-bottom: 1px dashed rgba(255,255,255,0.25);
+      }
+
+      .layout{
+        display:grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+        margin-top: 18px;
+      }
+
+      @media (min-width: 980px){
+        .layout{
+          grid-template-columns: 2.2fr 1fr;
+          align-items:start;
+        }
+      }
+
+      .panel{
+        border: 1px solid var(--border);
+        background: rgba(0,0,0,0.18);
+        border-radius: 18px;
+        overflow:hidden;
+      }
+
+      .panelHeader{
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(255,255,255,0.03);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+      }
+
+      .panelTitle{
+        margin:0;
+        font-size: 14px;
+        letter-spacing: 0.02em;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+
+      .panelBody{
+        padding: 16px;
+      }
+
+      .resultBox{
+        border: 1px solid var(--border2);
+        background: rgba(18,22,28,0.65);
+        border-radius: 14px;
+        padding: 12px 12px;
+        margin-bottom: 12px;
+      }
+
+      .resultLabel{
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 6px;
+      }
+
+      .resultValue{
+        font-size: 18px;
+        line-height: 1.25;
+        margin: 0;
+      }
+
+      .grid{
+        display:grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 14px;
+      }
+
+      .fieldCard{
+        border: 1px solid var(--border);
+        background: rgba(18,22,28,0.55);
+        border-radius: 16px;
+        padding: 12px 12px;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        min-width: 0;
+      }
+
+      .fieldTop{
+        display:flex;
+        flex-direction:column;
+        gap:4px;
+      }
+
+      .fieldName{
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        margin: 0;
+      }
+
+      .fieldDesc{
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0;
+        line-height: 1.3;
+      }
+
+      input[type="number"]{
+        width: 100%;
+        padding: 12px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.16);
+        background: rgba(255,255,255,0.12);
+        color: var(--text);
+        outline: none;
+        font-size: 15px;
+      }
+
+      input[type="number"]::placeholder{
+        color: rgba(233,238,245,0.55);
+      }
+
+      input[type="number"]:focus{
+        border-color: rgba(110,168,254,0.55);
+        box-shadow: 0 0 0 3px rgba(110,168,254,0.14);
+      }
+
+      .actions{
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px;
+        margin-top: 14px;
+        align-items:center;
+      }
+
+      .btn{
+        appearance:none;
+        border: 1px solid rgba(255,255,255,0.18);
+        background: rgba(0,0,0,0.35);
+        color: var(--text);
+        padding: 10px 14px;
+        border-radius: 14px;
+        cursor:pointer;
+        font-size: 15px;
+        font-weight: 650;
+      }
+
+      .btnPrimary{
+        border-color: rgba(110,168,254,0.45);
+        background: rgba(110,168,254,0.16);
+      }
+
+      .btn:hover{
+        border-color: rgba(255,255,255,0.28);
+      }
+
+      .btnPrimary:hover{
+        border-color: rgba(110,168,254,0.75);
+      }
+
+      .footerNote{
+        font-size: 13px;
+        color: var(--muted2);
+        margin-left: 6px;
+      }
+
+      code{
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 12.5px;
+        color: var(--text);
+        background: rgba(0,0,0,0.28);
+        border: 1px solid var(--border);
+        padding: 2px 6px;
+        border-radius: 10px;
+      }
+
+      .smallList{
+        margin: 10px 0 0;
+        padding: 0;
+        list-style: none;
+        display:flex;
+        flex-direction:column;
+        gap:8px;
+      }
+
+      .smallList li{
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .smallTitle{
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .hint{
+        font-size: 12px;
+        color: var(--muted2);
+        margin-top: 10px;
+      }
     </style>
   </head>
+
   <body>
     <div class="wrap">
-      <h1>{{ app_name }}</h1>
-      <p>Housing price prediction demo</p>
+      <div class="header">
+        <h1>{{ app_name }}</h1>
+        <p class="subtitle">{{ subtitle }}</p>
+        <p class="desc">{{ description }}</p>
 
-      <form action="{{ url_for('predict') }}" method="post">
-        <input type="number" step="any" name="CRIM" placeholder="CRIM" required />
-        <input type="number" step="any" name="ZN" placeholder="ZN" required />
-        <input type="number" step="any" name="INDUS" placeholder="INDUS" required />
-        <input type="number" step="any" name="CHAS" placeholder="CHAS" required />
-        <input type="number" step="any" name="NOX" placeholder="NOX" required />
-        <input type="number" step="any" name="RM" placeholder="RM" required />
-        <input type="number" step="any" name="AGE" placeholder="AGE" required />
-        <input type="number" step="any" name="DIS" placeholder="DIS" required />
-        <input type="number" step="any" name="RAD" placeholder="RAD" required />
-        <input type="number" step="any" name="TAX" placeholder="TAX" required />
-        <input type="number" step="any" name="PTRATIO" placeholder="PTRATIO" required />
-        <input type="number" step="any" name="B" placeholder="B" required />
-        <input type="number" step="any" name="LSTAT" placeholder="LSTAT" required />
+        <div class="metaRow">
+          <span class="pill">Target: <code>{{ target_name }}</code> <code>({{ target_units }})</code></span>
+          <span class="pill">Schema: <a href="/schema" target="_blank" rel="noreferrer">/schema</a></span>
+          <span class="pill">API: <span title="POST endpoint"><code>/predict_api</code></span></span>
+          <span class="pill">UI (User Interface) form, API (Application Programming Interface) via JSON (JavaScript Object Notation)</span>
+        </div>
+      </div>
 
-        <button type="submit">Predict</button>
-      </form>
+      <div class="layout">
+        <div class="panel">
+          <div class="panelHeader">
+            <p class="panelTitle">Inputs</p>
+          </div>
 
-      {% if prediction_text %}
-        <div class="pred">{{ prediction_text }}</div>
-      {% endif %}
+          <div class="panelBody">
+            <form id="harborForm" action="/predict" method="post" autocomplete="off">
+              <div class="grid">
+                {% for f in feature_specs %}
+                  <div class="fieldCard">
+                    <div class="fieldTop">
+                      <p class="fieldName">{{ f.label }}</p>
+                      <p class="fieldDesc">{{ f.description }}</p>
+                    </div>
 
-      <div class="note">
-        Demo only. Model trained on the classic Boston housing dataset.
+                    <input
+                      type="number"
+                      name="{{ f.name }}"
+                      id="{{ f.name }}"
+                      placeholder="{{ f.placeholder }}"
+                      step="{{ f.step }}"
+                      inputmode="decimal"
+                    />
+                  </div>
+                {% endfor %}
+              </div>
+
+              <div class="actions">
+                <button class="btn btnPrimary" type="submit">Predict</button>
+                <button class="btn" type="button" onclick="fillSample()">Fill sample values</button>
+                <button class="btn" type="button" onclick="clearForm()">Clear</button>
+                <span class="footerNote">Demo only. Do not use as real world pricing advice.</span>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panelHeader">
+            <p class="panelTitle">Result and tips</p>
+          </div>
+
+          <div class="panelBody">
+            <div class="resultBox">
+              <div class="resultLabel">Prediction</div>
+              <p class="resultValue">
+                {% if prediction_text %}
+                  {{ prediction_text }}
+                {% else %}
+                  Enter values and click Predict.
+                {% endif %}
+              </p>
+            </div>
+
+            <p class="smallTitle">Quick checks</p>
+            <ul class="smallList">
+              <li>Health endpoint: <code>/health</code></li>
+              <li>Schema endpoint: <code>/schema</code></li>
+              <li>API expects JSON body with key <code>data</code></li>
+            </ul>
+
+            <p class="hint">
+              HTML (HyperText Markup Language) renders this page.
+              CSS (Cascading Style Sheets) uses a responsive grid soDB=.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
+
+    <script>
+      const SAMPLE = {
+        {% for f in feature_specs %}
+          "{{ f.name }}": "{{ f.placeholder }}",
+        {% endfor %}
+      };
+
+      function fillSample(){
+        for (const [k, v] of Object.entries(SAMPLE)){
+          const el = document.getElementById(k);
+          if (el) el.value = v;
+        }
+      }
+
+      function clearForm(){
+        const form = document.getElementById("harborForm");
+        if (!form) return;
+        form.reset();
+        for (const k of Object.keys(SAMPLE)){
+          const el = document.getElementById(k);
+          if (el) el.value = "";
+        }
+      }
+    </script>
   </body>
 </html>
