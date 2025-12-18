@@ -1,39 +1,94 @@
-import json
+import os
 import pickle
+from pathlib import Path
 
-from flask import Flask,request,app,jsonify,url_for,render_template
 import numpy as np
-import pandas as pd
+from flask import Flask, jsonify, render_template, request
 
-app=Flask(__name__)
-## Load the model
-regmodel=pickle.load(open('regmodel.pkl','rb'))
-scalar=pickle.load(open('scaling.pkl','rb'))
-@app.route('/')
+APP_NAME = "PeakWhale Harbor"
+
+FEATURE_ORDER = [
+    "CRIM",
+    "ZN",
+    "INDUS",
+    "CHAS",
+    "NOX",
+    "RM",
+    "AGE",
+    "DIS",
+    "RAD",
+    "TAX",
+    "PTRATIO",
+    "B",
+    "LSTAT",
+]
+
+BASE_DIR = Path(__file__).resolve().parent
+ARTIFACTS_DIR = BASE_DIR / "artifacts"
+MODEL_PATH = ARTIFACTS_DIR / "regmodel.pkl"
+SCALER_PATH = ARTIFACTS_DIR / "scaling.pkl"
+
+app = Flask(__name__)
+
+with MODEL_PATH.open("rb") as f:
+    model = pickle.load(f)
+
+with SCALER_PATH.open("rb") as f:
+    scaler = pickle.load(f)
+
+
+@app.get("/health")
+def health():
+    return jsonify(status="ok", app=APP_NAME)
+
+
+@app.get("/")
 def home():
-    return render_template('home.html')
+    return render_template("home.html", app_name=APP_NAME)
 
-@app.route('/predict_api',methods=['POST'])
+
+@app.post("/predict_api")
 def predict_api():
-    data=request.json['data']
-    print(data)
-    print(np.array(list(data.values())).reshape(1,-1))
-    new_data=scalar.transform(np.array(list(data.values())).reshape(1,-1))
-    output=regmodel.predict(new_data)
-    print(output[0])
-    return jsonify(output[0])
+    payload = request.get_json(silent=True) or {}
+    data = payload.get("data")
 
-@app.route('/predict',methods=['POST'])
+    if not isinstance(data, dict):
+        return jsonify(error="Expected JSON body with key 'data' as an object."), 400
+
+    missing = [k for k in FEATURE_ORDER if k not in data]
+    if missing:
+        return jsonify(error="Missing required features.", missing=missing), 400
+
+    try:
+        x = np.array([float(data[k]) for k in FEATURE_ORDER], dtype=float).reshape(1, -1)
+        x_scaled = scaler.transform(x)
+        y = float(model.predict(x_scaled)[0])
+        return jsonify(prediction=y)
+    except Exception as e:
+        return jsonify(error=str(e)), 400
+
+
+@app.post("/predict")
 def predict():
-    data=[float(x) for x in request.form.values()]
-    final_input=scalar.transform(np.array(data).reshape(1,-1))
-    print(final_input)
-    output=regmodel.predict(final_input)[0]
-    return render_template("home.html",prediction_text="The House price prediction is {}".format(output))
+    try:
+        values = [float(request.form[k]) for k in FEATURE_ORDER]
+        x = np.array(values, dtype=float).reshape(1, -1)
+        x_scaled = scaler.transform(x)
+        y = float(model.predict(x_scaled)[0])
+        return render_template(
+            "home.html",
+            app_name=APP_NAME,
+            prediction_text=f"Harbor prediction: {y}",
+        )
+    except Exception as e:
+        return render_template(
+            "home.html",
+            app_name=APP_NAME,
+            prediction_text=f"Input error: {e}",
+        )
 
 
-
-if __name__=="__main__":
-    app.run(debug=True)
-   
-     
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", "5000"))
+    debug = os.getenv("FLASK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=port, debug=debug)

@@ -1,6 +1,16 @@
-FROM python:3.7
-COPY . /app
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
+
 WORKDIR /app
-RUN pip install -r requirements.txt
-EXPOSE $PORT
-CMD gunicorn --workers=4 --bind 0.0.0.0:$PORT app:app
+
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . /app
+
+EXPOSE 8000
+
+CMD gunicorn --workers=2 --threads=4 --bind 0.0.0.0:$PORT app:app

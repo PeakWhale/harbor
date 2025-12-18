@@ -1,48 +1,50 @@
 <!DOCTYPE html>
-<html >
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }}</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; padding: 32px; }
+      .wrap { max-width: 520px; }
+      h1 { margin: 0 0 6px; font-size: 44px; }
+      p { margin: 0 0 18px; color: #444; }
+      input { width: 100%; padding: 10px 12px; margin: 6px 0; border: 1px solid #bbb; border-radius: 6px; font-size: 16px; }
+      button { margin-top: 10px; padding: 10px 14px; border: 1px solid #333; border-radius: 8px; background: #fff; font-size: 16px; cursor: pointer; }
+      .pred { margin-top: 22px; font-size: 22px; }
+      .note { margin-top: 8px; font-size: 13px; color: #666; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>{{ app_name }}</h1>
+      <p>Housing price prediction demo</p>
 
-<head>
-  <meta charset="UTF-8">
-  <title>ML API</title>
-  <link href='https://fonts.googleapis.com/css?family=Pacifico' rel='stylesheet' type='text/css'>
-<link href='https://fonts.googleapis.com/css?family=Arimo' rel='stylesheet' type='text/css'>
-<link href='https://fonts.googleapis.com/css?family=Hind:300' rel='stylesheet' type='text/css'>
-<link href='https://fonts.googleapis.com/css?family=Open+Sans+Condensed:300' rel='stylesheet' type='text/css'>
+      <form action="{{ url_for('predict') }}" method="post">
+        <input type="number" step="any" name="CRIM" placeholder="CRIM" required />
+        <input type="number" step="any" name="ZN" placeholder="ZN" required />
+        <input type="number" step="any" name="INDUS" placeholder="INDUS" required />
+        <input type="number" step="any" name="CHAS" placeholder="CHAS" required />
+        <input type="number" step="any" name="NOX" placeholder="NOX" required />
+        <input type="number" step="any" name="RM" placeholder="RM" required />
+        <input type="number" step="any" name="AGE" placeholder="AGE" required />
+        <input type="number" step="any" name="DIS" placeholder="DIS" required />
+        <input type="number" step="any" name="RAD" placeholder="RAD" required />
+        <input type="number" step="any" name="TAX" placeholder="TAX" required />
+        <input type="number" step="any" name="PTRATIO" placeholder="PTRATIO" required />
+        <input type="number" step="any" name="B" placeholder="B" required />
+        <input type="number" step="any" name="LSTAT" placeholder="LSTAT" required />
 
-  
-</head>
+        <button type="submit">Predict</button>
+      </form>
 
-<body>
- <div class="login">
-	<h1>Boston House Price Prediction</h1>
+      {% if prediction_text %}
+        <div class="pred">{{ prediction_text }}</div>
+      {% endif %}
 
-     <!-- Main Input For Receiving Query to our ML -->
-    <form action="{{ url_for('predict')}}"method="post">
-      <input type="text" name="CRIM" placeholder="CRIM" required="required" /><br>
-    	<input type="text" name="ZN" placeholder="ZN" required="required" /><br>
-        <input type="text" name="INDUS" placeholder="INDUS" required="required" /><br>
-        <input type="text" name="CHAS" placeholder="CHAS" required="required" /><br>
-        <input type="text" name="NOX" placeholder="NOX" required="required" /><br>
-        <input type="text" name="RM" placeholder="RM" required="required" /><br>
-        <input type="text" name="Age" placeholder="Age" required="required" /><br>
-        <input type="text" name="DIS" placeholder="DIS" required="required" /><br>
-        <input type="text" name="RAD" placeholder="RAD" required="required" /><br>
-        <input type="text" name="TAX" placeholder="TAX" required="required" /><br>
-        <input type="text" name="PTRATIO" placeholder="PTRATIO" required="required" /><br>
-        <input type="text" name="B" placeholder="B" required="required" /><br>
-        <input type="text" name="LSTAT" placeholder="LSTAT" required="required" /><br>
-
-       
-
-        <button type="submit" class="btn btn-primary btn-block btn-large">Predict</button>
-    </form>
-
-   <br>
-   <br>
-  
-   
- </div>
- {{prediction_text}}
-
-</body>
+      <div class="note">
+        Demo only. Model trained on the classic Boston housing dataset.
+      </div>
+    </div>
+  </body>
 </html>
