@@ -1,4 +1,3 @@
-````md
 # PeakWhale™ Harbor
 
 ### Valuation and Forecasting Sandbox (Local First, Open Source, Demo First)
@@ -12,15 +11,20 @@
 ![Heroku](https://img.shields.io/badge/Heroku-Docker%20Deploy-79589F)
 ![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-green)
 
-PeakWhale™ Harbor is a local first valuation and forecasting demo app that exposes a simple Machine Learning (ML) model through a Flask web interface and a JSON Application Programming Interface (API).
+PeakWhale™ Harbor is a local first valuation and forecasting demo that serves a Machine Learning (ML) model through a Flask web User Interface (UI) and a JSON Application Programming Interface (API).
 
-It is intentionally lightweight, so you can use it as a clean reference for packaging artifacts, serving predictions, and deploying a container.
+It is intentionally lightweight so you can use it as a reference for model artifact packaging, deterministic inference, and container deployment.
 
-## What Harbor Does
+## Enterprise Business Problem
 
-You can enter feature values in a web form and get a prediction back.
+In real teams, model demos often fail to become usable services because:
 
-You can also call a JSON API endpoint for programmatic predictions.
+* artifacts are scattered or not versioned
+* feature ordering is ambiguous at inference time
+* local runs are not repeatable across machines
+* deployments drift from development environments
+
+Harbor is a small, readable example of doing the basics cleanly.
 
 ## Important Notice
 
@@ -28,10 +32,19 @@ This repository uses a classic housing dataset for demonstration only.
 
 Do not treat outputs as real world pricing advice.
 
+## What Harbor Does
+
+Harbor provides two ways to run predictions:
+
+* UI form based prediction from a browser
+* API based prediction from JSON requests
+
+It also includes a simple health endpoint so deployments can be monitored.
+
 ## App Endpoints
 
-* `/` renders the user interface (UI)
-* `/health` returns a simple health check JSON
+* `/` renders the UI
+* `/health` returns a health check JSON
 * `/predict` accepts HTML form posts
 * `/predict_api` accepts JSON payloads
 
@@ -57,16 +70,16 @@ curl -X POST http://localhost:5000/predict_api \
       "LSTAT": 12.0
     }
   }'
-````
+```
 
 ## Tech Stack
 
 * Python 3.11+
 * Flask web server
-* scikit-learn model and preprocessing
+* scikit learn for the model and preprocessing
 * Gunicorn Web Server Gateway Interface (WSGI) server for production
 * Docker for container builds
-* GitHub Actions for Continuous Integration (CI) and deployment workflow
+* GitHub Actions for Continuous Integration (CI) deployment workflow
 * Heroku deployment via Docker image push
 
 ## Repository Structure
@@ -87,6 +100,15 @@ harbor/
   README.md
   LICENSE
 ```
+
+## Model Artifacts
+
+Harbor loads two artifacts at runtime:
+
+* `artifacts/regmodel.pkl` contains the trained model
+* `artifacts/scaling.pkl` contains the fitted scaler
+
+Inference enforces a fixed feature order to keep predictions deterministic.
 
 ## Quick Start
 
@@ -115,7 +137,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Then open:
+Open:
 
 ```text
 http://localhost:5000
@@ -135,7 +157,7 @@ docker build -t peakwhale-harbor .
 docker run -p 8000:8000 -e PORT=8000 peakwhale-harbor
 ```
 
-Then open:
+Open:
 
 ```text
 http://localhost:8000
@@ -143,7 +165,7 @@ http://localhost:8000
 
 ## Deploy to Heroku via GitHub Actions
 
-This repo includes a GitHub Actions workflow that builds and pushes a Docker image to Heroku on every push to `main`.
+This repository deploys on pushes to `main` using GitHub Actions.
 
 Required GitHub repository secrets:
 
@@ -153,12 +175,12 @@ Required GitHub repository secrets:
 
 ## Why This Project Exists
 
-PeakWhale™ Harbor demonstrates practical patterns you will reuse in production ML services:
+Harbor demonstrates practical patterns you will reuse in production ML services:
 
-* Artifact management for model and scaler
-* Deterministic feature ordering for inference
-* Local first development and repeatable runs
-* Container first deployment path
+* artifact management for model and scaler
+* deterministic feature ordering at inference time
+* local first development and repeatable runs
+* container based deployment path
 
 ## Part of the PeakWhale™ Ecosystem
 
@@ -174,7 +196,3 @@ Apache 2.0 License
 ## Author
 
 Built by Addy
-
-```
-::contentReference[oaicite:0]{index=0}
-```
