@@ -1,23 +1,52 @@
-name: Deploy Harbor to Heroku
+name: CI and Publish Container
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  build:
+  build_and_smoke_test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Build, Push and Release Docker container to Heroku
-        uses: gonuit/heroku-docker-deploy@v1.3.3
-        with:
-          email: ${{ secrets.HEROKU_EMAIL }}
-          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
-          heroku_app_name: ${{ secrets.HEROKU_APP_NAME }}
-          dockerfile_directory: ./
-          dockerfile_name: Dockerfile
-          docker_options: "--no-cache"
-          process_type: web
+      - name: Build Docker image
+        run: docker build -t harbor:ci .
+
+      - name: Run container
+        run: |
+          docker run -d --name harbor -p 8000:8000 -e PORT=8000 harbor:ci
+          sleep 3
+
+      - name: Smoke test health endpoint
+        run: |
+          curl -fsS http://localhost:8000/health
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f harbor
+
+  publish_ghcr:
+    needs: build_and_smoke_test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}"
+          docker build -t "${IMAGE}:latest" -t "${IMAGE}:${{ github.sha }}" .
+          docker push "${IMAGE}:latest"
+          docker push "${IMAGE}:${{ github.sha }}"
