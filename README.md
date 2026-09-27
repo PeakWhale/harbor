@@ -1,3 +1,5 @@
+<p><img src="harbor.svg" width="64" height="64" alt="Harbor logo"></p>
+
 # PeakWhale™ Harbor
 
 ### Valuation and Forecasting Sandbox (Local First, Open Source, Demo First)
