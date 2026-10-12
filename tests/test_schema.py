@@ -120,6 +120,7 @@ def test_user_overrides_work_for_predictions(tmp_path):
     b = train(df, "target", tmp_path / "overrides", categorical=["rooms"], drop=["size"], numeric=["flag"])
     f = by_name(b.features)
     assert f["flag"]["true_false"] is True
+    assert b.schema["input"]["properties"]["flag"]["type"] == ["number", "boolean", "null"]
     record = {"rooms": 2, "color": "red", "flag": True, "price_text": 3}
     results = b.predict([record, {**record, "flag": "false"}, {**record, "flag": "TRUE"}, {**record, "flag": 0}])
     for r in results:

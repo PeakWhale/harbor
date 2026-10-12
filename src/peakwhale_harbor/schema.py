@@ -548,7 +548,8 @@ def input_json_schema(features: Sequence[Mapping[str, Any]], title: str) -> dict
         description = f.get("description") or ""
         if f["type"] == "numeric":
             hint = f"Seen in training: {f['min']} to {f['max']}."
-            prop: dict[str, Any] = {"type": ["number", "null"], "examples": [f["median"]]}
+            types = ["number", "boolean", "null"] if f.get("true_false") else ["number", "null"]
+            prop: dict[str, Any] = {"type": types, "examples": [f["median"]]}
         else:
             hint = "One of the listed values."
             prop = {"type": ["string", "null"], "enum": [*f["categories"], None], "examples": [f["most_common"]]}
