@@ -11,7 +11,27 @@ permissions:
   packages: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -e ".[dev]"
+
+      - name: Run tests
+        run: pytest -q
+
   build_and_smoke_test:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,13 +41,23 @@ jobs:
         run: docker build -t harbor:ci .
 
       - name: Run container
-        run: |
-          docker run -d --name harbor -p 8000:8000 -e PORT=8000 harbor:ci
-          sleep 3
+        run: docker run -d --name harbor -p 8000:8000 -e PORT=8000 harbor:ci
 
       - name: Smoke test health endpoint
         run: |
-          curl -fsS http://localhost:8000/health
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs harbor
+          exit 1
+
+      - name: Smoke test prediction
+        run: |
+          curl -fsS http://localhost:8000/schema \
+            | python3 -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["example_request"]))' > request.json
+          curl -fsS -X POST http://localhost:8000/predict_api \
+            -H "Content-Type: application/json" -d @request.json
 
       - name: Stop container
         if: always()
