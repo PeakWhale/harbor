@@ -2,197 +2,372 @@
 
 # PeakWhale™ Harbor
 
-### Valuation and Forecasting Sandbox (Local First, Open Source, Demo First)
+### Turn a Spreadsheet into a Prediction API (Local First, Open Source)
 
-![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Flask](https://img.shields.io/badge/Flask-Web%20App-black)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-orange)
 ![Docker](https://img.shields.io/badge/Docker-Containerization-informational)
 ![Gunicorn](https://img.shields.io/badge/Gunicorn-WSGI%20Server-success)
 ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-CI-2088FF)
 ![GHCR](https://img.shields.io/badge/GHCR-Container%20Registry-6f42c1)
+![MCP](https://img.shields.io/badge/MCP-AI%20Assistants-8a2be2)
 ![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-green)
 
-PeakWhale™ Harbor is a local first demo that serves a scikit learn regression model through a Flask web User Interface (UI) and a JSON Application Programming Interface (API).
+PeakWhale™ Harbor reads a CSV file and learns to predict one number column.
+Then it gives you:
 
-The current model predicts the Boston housing target MEDV, median home value in thousands of US dollars, using the classic feature set.
+* a web page with a form that is made from your columns
+* a JSON API (Application Programming Interface)
+* batch predictions: upload a CSV file, get a CSV file back
+* a **range** with every prediction ("likely between X and Y"), not only one number
+* honest test results, measured on rows the model never saw
 
-## Enterprise Business Problem
+Everything runs on your own computer. No cloud account is needed.
 
-In real teams, demos often fail to become usable services because:
+## Who Is It For
 
-* artifacts are scattered or not versioned
-* feature ordering is ambiguous at inference time
-* local runs are not repeatable across machines
-* deployments drift from development environments
+* Analysts and small teams who have a spreadsheet and want a quick, local prediction service.
+* Developers who need a solid first model behind an API, with a clear schema.
+* Learners who want to see the full path from a CSV file to a running, tested service.
 
-Harbor is a small, readable example of doing the basics cleanly.
+Harbor is a starting point. It is not a tool for high-stakes decisions without expert review.
 
-## Important Notice
+## Quick Start (3 Steps)
 
-This repository uses a classic housing dataset for demonstration only.
+You need Python 3.10 or newer.
 
-Do not treat outputs as real world pricing advice.
-
-## What Harbor Does
-
-Harbor provides:
-
-* UI based prediction from a browser
-* API based prediction from JSON requests
-* a health endpoint for monitoring
-* a schema endpoint that documents inputs and outputs
-
-## App Endpoints
-
-* `/` renders the UI
-* `/health` returns a health check JSON
-* `/schema` returns model metadata and required input fields
-* `/predict` accepts HTML form posts
-* `/predict_api` accepts JSON payloads
-
-## Model Inputs
-
-Inputs are the standard Boston housing features:
-
-* `CRIM` per capita crime rate by town
-* `ZN` proportion of residential land zoned for lots over 25,000 sq ft
-* `INDUS` proportion of non retail business acres per town
-* `CHAS` Charles River dummy variable (1 if tract bounds river, else 0)
-* `NOX` nitric oxides concentration (parts per 10 million)
-* `RM` average number of rooms per dwelling
-* `AGE` proportion of owner occupied units built prior to 1940
-* `DIS` weighted distances to five Boston employment centres
-* `RAD` index of accessibility to radial highways
-* `TAX` full value property tax rate per 10,000 dollars
-* `PTRATIO` pupil teacher ratio by town
-* `B` 1000(Bk minus 0.63)^2 where Bk is the proportion of Black residents by town
-* `LSTAT` percent lower status of the population
-
-Output:
-
-* `prediction` predicted MEDV, in thousands of US dollars
-
-## Example API Request
+**1. Install**
 
 ```bash
-curl -X POST http://localhost:5000/predict_api \
+git clone https://github.com/PeakWhale/harbor.git
+cd harbor
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+**2. Train the demo model** (California housing data, about 10 seconds)
+
+```bash
+harbor train data/california_housing.csv --target median_house_value \
+  --descriptions data/california_housing.columns.json \
+  --out models/california-housing
+```
+
+**3. Start the app**
+
+```bash
+harbor serve models/california-housing
+```
+
+Open <http://127.0.0.1:5050>. Change some values and click **Predict**.
+(Use `--port` to pick another port.)
+
+Prefer Docker? Run `docker build -t peakwhale-harbor .` and then
+`docker run -p 8000:8000 peakwhale-harbor`. Open <http://localhost:8000>.
+
+## Bring Your Own CSV
+
+Your file needs:
+
+* one header row with column names
+* one row per example (one house, one order, one machine, and so on)
+* one column with the number you want to predict (the **target**)
+
+Then run:
+
+```bash
+harbor train my_data.csv --target price
+harbor serve models/my-data
+```
+
+Harbor looks at every column and decides what to do with it:
+
+| What the column holds | What Harbor does |
+| --- | --- |
+| Numbers | Uses it as a **numeric** input. Empty cells are fine. |
+| A few different text values (like "north", "south") | Uses it as a **categorical** input. |
+| A different value in almost every row (IDs, names, free text) | Skips it and tells you why. |
+| Dates | Skips it. Add columns like `year` or `month` instead. |
+| Only empty cells, or the same value in every row | Skips it. |
+
+Harbor prints its choices. If a choice is wrong, change it:
+
+```bash
+harbor train my_data.csv --target price \
+  --drop customer_name \
+  --categorical zip_code \
+  --numeric rating
+```
+
+Other useful options:
+
+* `--out models/my-model` picks the output folder.
+* `--coverage 0.8` asks for an 80% range instead of 90%.
+* `--seed 7` changes the random split.
+* `--title "My Model"` and `--descriptions columns.json` set the text on the web page.
+  `columns.json` is a simple JSON object: `{"column name": "short description"}`.
+
+Run `harbor train --help` to see all options.
+
+Harbor also has a second, small example that is not about housing. It is made-up
+data about machine repairs at a factory:
+
+```bash
+harbor train examples/equipment_repairs.csv --target repair_hours
+harbor serve models/equipment-repairs
+```
+
+More commands:
+
+```bash
+harbor info models/equipment-repairs                      # inputs and test results
+harbor predict models/equipment-repairs new_rows.csv --out predictions.csv
+```
+
+Excel file? Save it as CSV first (File > Save As > CSV).
+
+## What Is in a Model Bundle
+
+`harbor train` writes one folder, called a **bundle**:
+
+```text
+models/california-housing/
+  model.skops     the trained models (skops format)
+  schema.json     input fields, target, range settings, JSON Schema for the API
+  metrics.json    test results on rows the model never saw
+  metadata.json   when and how it was trained: options, row counts, library versions, checksums
+```
+
+The models are saved with [skops](https://skops.readthedocs.io), not with Python
+pickle. skops refuses unknown object types, and Harbor only allows a short, fixed list
+of extra types. Harbor also checks the file against the SHA-256 checksum in
+`metadata.json`.
+
+> **Safety:** loading a model file from an untrusted source is never fully safe,
+> even with skops. Treat a bundle like a program. Only load bundles that you trained
+> yourself or that come from someone you trust.
+
+A bundle works best with the same library versions that trained it. Harbor warns
+you when the scikit-learn version is different. In that case, train again.
+
+## API
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /` | The web page with the form |
+| `GET /health` | Health check |
+| `GET /schema` | Inputs, target, metrics, JSON Schema and an example request |
+| `POST /predict_api` | Predict one record or a list of records (JSON) |
+| `POST /predict_batch` | Upload a CSV file (form field `file`), get a CSV file back |
+| `GET /template.csv` | A CSV file with the right columns and one example row |
+| `POST /predict` | Form posts from the web page |
+
+The examples below use the demo model on port 5050.
+
+**One record**
+
+```bash
+curl -X POST http://localhost:5050/predict_api \
   -H "Content-Type: application/json" \
   -d '{
     "data": {
-      "CRIM": 0.1,
-      "ZN": 0.0,
-      "INDUS": 8.0,
-      "CHAS": 0,
-      "NOX": 0.5,
-      "RM": 6.0,
-      "AGE": 65.0,
-      "DIS": 4.0,
-      "RAD": 4.0,
-      "TAX": 300.0,
-      "PTRATIO": 18.0,
-      "B": 390.0,
-      "LSTAT": 12.0
+      "longitude": -122.23,
+      "latitude": 37.88,
+      "housing_median_age": 41,
+      "total_rooms": 880,
+      "total_bedrooms": 129,
+      "population": 322,
+      "households": 126,
+      "median_income": 8.3252,
+      "ocean_proximity": "NEAR BAY"
     }
   }'
 ```
 
-## Tech Stack
+The answer looks like this (numbers shortened):
 
-* Python 3.11+
-* Flask web server
-* scikit learn for preprocessing and regression
-* Gunicorn Web Server Gateway Interface (WSGI) server for production
-* Docker for container builds
-* GitHub Actions for Continuous Integration (CI)
-* GitHub Container Registry (GHCR) for publishing images
+```json
+{
+  "prediction": 440721.9,
+  "low": 309631.6,
+  "high": 508067.3,
+  "coverage": 0.9,
+  "notes": [],
+  "target": {"name": "median_house_value", "description": "Median house value in the district, ..."}
+}
+```
 
-## Repository Structure
+**Rules for input**
+
+* Send every input field. Use `null` when a value is unknown. The model can handle
+  empty values, and `notes` tells you about them.
+* Extra fields are ignored.
+* A category value must be one of the values seen in training (upper or lower case does not matter).
+* A number outside the range seen in training is allowed, but `notes` warns you.
+
+**Many records**: send a list, `{"data": [{...}, {...}]}`, up to 1,000 records.
+The answer has a `predictions` list.
+
+**Errors** return HTTP 400 and say what is wrong:
+
+```json
+{
+  "error": "1 problem(s) found in the input.",
+  "problems": [
+    {
+      "row": 0,
+      "field": "ocean_proximity",
+      "error": "unknown value 'BEACH'. Allowed values: '<1H OCEAN', 'INLAND', 'ISLAND', 'NEAR BAY', 'NEAR OCEAN'"
+    }
+  ],
+  "required": ["longitude", "latitude", "..."]
+}
+```
+
+**CSV batch**
+
+```bash
+curl -o template.csv http://localhost:5050/template.csv
+curl -F file=@template.csv http://localhost:5050/predict_batch -o predictions.csv
+```
+
+You get your file back with four new columns: `<target>_prediction`, `<target>_low`,
+`<target>_high` and `notes`. Errors give the CSV line number. Uploads are limited to
+10 MB (set `HARBOR_MAX_UPLOAD_MB` to change this).
+
+## How the Ranges Work
+
+A single number hides how sure the model is. So Harbor gives a range too.
+
+1. Harbor splits your rows: 60% to **train**, 20% to **calibrate**, 20% to **test**.
+2. It trains three gradient boosting models (scikit-learn
+   `HistGradientBoostingRegressor`) on the train rows:
+   one for the best guess, one for a low value (5th percentile) and one for a high
+   value (95th percentile).
+3. On the calibration rows, Harbor checks how often the true value falls inside the
+   low-high range. Then it makes the range a little wider or narrower, so that about
+   90% of true values fall inside. This method is called
+   *conformalized quantile regression* (Romano, Patterson and Candès, 2019).
+4. On the test rows, which no model has seen, Harbor measures how often the true value
+   really was inside the range. That number is in `metrics.json` and on the web page.
+
+What "90% range" means: over many predictions, about 9 out of 10 true values should be
+inside their range. It is not a promise for one single row. It only holds when new rows
+look like the training rows. The range always contains the best guess. If the target
+is never negative in your data, the range does not go below zero.
+
+The range is wider when a row is harder to predict. That is useful: a wide range
+tells you to be careful.
+
+## Demo Results (Measured)
+
+These numbers come from the commands below, run with the versions in
+`requirements.txt` (Python 3.11). The Docker build runs the same command and printed
+the same numbers. All numbers are measured on test rows that the model never saw.
+
+**California housing** (20,640 rows, 4,128 test rows):
+
+```bash
+harbor train data/california_housing.csv --target median_house_value \
+  --descriptions data/california_housing.columns.json \
+  --out models/california-housing
+```
 
 ```text
-harbor/
-  app.py
-  artifacts/
-    regmodel.pkl
-    scaling.pkl
-  templates/
-    home.html
-  .github/
-    workflows/
-      main.yaml
-  Dockerfile
-  requirements.txt
-  README.md
-  LICENSE
+Hold-out test results (4,128 rows the model never saw):
+  Typical error (MAE)                31,278
+  Root mean squared error (RMSE)     46,501
+  R² (1.0 is perfect)                0.835
+  Simple guess error (median)        87,404
+  90% range: true value inside       90.0% of test rows
+  Average range width                142,583
 ```
 
-## Model Artifacts
+The values are in US dollars of 1990. The "simple guess" always predicts the median
+house value of the training rows. The model's typical error is about one third of that.
 
-Harbor loads two artifacts at runtime:
-
-* `artifacts/regmodel.pkl` contains the trained regression model
-* `artifacts/scaling.pkl` contains the fitted scaler
-
-Inference enforces a fixed feature order to keep predictions deterministic.
-
-## Quick Start
-
-### Prerequisites
-
-* Python 3.11 or newer
-* pip installed
-
-### Create and activate a virtual environment
+**Equipment repairs** (1,200 made-up rows, 240 test rows):
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
+harbor train examples/equipment_repairs.csv --target repair_hours
 ```
-
-### Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### Run the app
-
-```bash
-python app.py
-```
-
-Open:
 
 ```text
-http://localhost:5000
+Hold-out test results (240 rows the model never saw):
+  Typical error (MAE)                6.38
+  Root mean squared error (RMSE)     8.66
+  R² (1.0 is perfect)                0.661
+  Simple guess error (median)        11.92
+  90% range: true value inside       87.1% of test rows
+  Average range width                23.58
+```
+
+With only 240 test rows, the measured share moves around by a few points. Here it is
+87.1%, a bit below the 90% goal. Small data gives less exact ranges.
+
+Other library versions or another `--seed` can change these numbers a little.
+
+## Use Harbor from an AI Assistant (MCP)
+
+Harbor can run as an MCP (Model Context Protocol) server. AI assistants that support
+MCP can then ask your model for predictions. There are two tools:
+
+* `describe_model`: the input fields, allowed values, target and test results
+* `predict`: one prediction with its range and notes
+
+Install the extra package and start the server:
+
+```bash
+pip install -e ".[mcp]"
+harbor mcp models/california-housing
+```
+
+The server talks over standard input and output, so normally your assistant starts
+it for you. Add it to your assistant's MCP settings (for example
+`claude_desktop_config.json`). Use full paths:
+
+```json
+{
+  "mcpServers": {
+    "harbor-california-housing": {
+      "command": "/full/path/to/harbor/.venv/bin/harbor",
+      "args": ["mcp", "/full/path/to/harbor/models/california-housing"]
+    }
+  }
+}
 ```
 
 ## Docker
 
-### Build
+The image trains the California demo model while it builds. Then it serves the model
+with Gunicorn on port 8000.
 
 ```bash
 docker build -t peakwhale-harbor .
-```
-
-### Run
-
-```bash
 docker run --name harbor -p 8000:8000 -e PORT=8000 peakwhale-harbor
 ```
 
-Open:
+To serve your own bundle, mount it and set `HARBOR_BUNDLE`:
 
-```text
-http://localhost:8000
+```bash
+docker run -p 8000:8000 \
+  -v "$PWD/models/my-model:/bundle:ro" \
+  -e HARBOR_BUNDLE=/bundle \
+  peakwhale-harbor
 ```
+
+Settings: `PORT` (default 8000), `WORKERS` (Gunicorn workers, default 2),
+`HARBOR_BUNDLE` and `HARBOR_MAX_UPLOAD_MB`. The container runs as a normal user, not root.
 
 ## Run from GHCR
 
-On pushes to `main`, GitHub Actions builds and publishes an image to GHCR.
+On pushes to `main`, GitHub Actions runs the tests, builds the image, checks
+`/health` and one prediction, and then publishes the image to GHCR.
 
-If the package is private, authenticate with a GitHub Personal Access Token (PAT) that has `read:packages` permission:
+If the package is private, log in with a GitHub Personal Access Token (PAT) that has
+the `read:packages` permission:
 
 ```bash
 docker login ghcr.io -u YOUR_GITHUB_USERNAME
@@ -200,20 +375,78 @@ docker pull ghcr.io/peakwhale/harbor:latest
 docker run --name harbor -p 8000:8000 -e PORT=8000 ghcr.io/peakwhale/harbor:latest
 ```
 
-## Why This Project Exists
+## Honest Limits
 
-Harbor demonstrates practical patterns you will reuse in production ML services:
+* **Not financial or appraisal advice.** The demo data is from 1990. It does not tell
+  you what a home is worth today.
+* **Numbers only.** Harbor predicts a number (regression). Yes/no or category targets
+  are not supported yet.
+* **No dates or free text.** Harbor skips these columns.
+* **New data can be different.** Test results and ranges hold for rows that look like
+  the training rows. A number outside the training range gets a note, because the
+  model cannot extrapolate.
+* **Random split.** Harbor splits rows at random. If your rows are in time order (for
+  example sales by month), the real future error can be larger than the test error.
+* **Capped data.** In the California data, house values stop at 500,001. The model
+  cannot tell you anything about more expensive areas. The high end of a range can go a
+  little above the cap.
+* **Small data, less exact.** With a few hundred rows, test results and ranges move around.
+* **No login.** The API has no authentication. Do not put it on the public internet
+  without a proxy that adds it.
+* **Trust your bundles.** Only load model files you trust (see above).
 
-* artifact management for model and scaler
-* deterministic feature ordering at inference time
-* local first development and repeatable runs
-* container based deployment path
+## Data and Licenses
+
+* California housing data: from the 1990 U.S. Census, via Pace and Barry (1997) and
+  the Apache-2.0 [handson-ml2](https://github.com/ageron/handson-ml2) repository.
+  Source, checksum and details are in [data/README.md](data/README.md).
+* Equipment repairs data: made up by `scripts/make_example_data.py` (fixed seed).
+* Earlier versions of Harbor used the Boston housing data. That data set is retired,
+  because one of its columns was built from the share of Black residents in each
+  town. Harbor no longer uses it.
+
+## Development
+
+```bash
+pip install -r requirements.txt -e ".[dev]"
+pytest
+```
+
+The tests cover column type inference, train → save → load → predict, the API
+endpoints, CSV batch files, bad input, the MCP server, and the rule that every range
+contains its prediction.
+
+## Repository Structure
+
+```text
+harbor/
+  src/peakwhale_harbor/
+    cli.py           the harbor command
+    schema.py        column types and input checks
+    train.py         training, ranges and metrics
+    bundle.py        save and load bundles, predictions
+    server.py        Flask web app and API
+    mcp_server.py    MCP server for AI assistants
+    templates/home.html
+  data/              California housing demo data and its source notes
+  examples/          made-up equipment repairs data
+  scripts/           script that makes the example data
+  tests/             pytest tests
+  .github/workflows/main.yaml
+  Dockerfile
+  entrypoint.sh
+  pyproject.toml
+  requirements.txt   exact versions for Docker and CI
+  LICENSE
+```
 
 ## Part of the PeakWhale™ Ecosystem
 
 * PeakWhale™ Helm, multi agent financial intelligence
 * PeakWhale™ Orca, real time fraud detection
-* PeakWhale™ Harbor, valuation and forecasting sandbox
+* PeakWhale™ Harbor, turn a spreadsheet into a prediction API
+* PeakWhale™ Trident
+* PeakWhale™ Berth, EV fleet charging planner
 
 ## License
 
