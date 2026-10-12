@@ -1,0 +1,12 @@
+{
+  "longitude": "Longitude of the district. More negative means further west.",
+  "latitude": "Latitude of the district. Higher means further north.",
+  "housing_median_age": "Median age of the houses in the district, in years (capped at 52).",
+  "total_rooms": "Total number of rooms in the district.",
+  "total_bedrooms": "Total number of bedrooms in the district. Can be left empty.",
+  "population": "Number of people who live in the district.",
+  "households": "Number of households in the district.",
+  "median_income": "Median household income, in tens of thousands of US dollars (3.5 means $35,000).",
+  "ocean_proximity": "Rough location of the district compared to the ocean or the bay.",
+  "median_house_value": "Median house value in the district, in US dollars, 1990 (capped at 500,001)."
+}
