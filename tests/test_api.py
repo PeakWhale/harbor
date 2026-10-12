@@ -160,6 +160,20 @@ def test_batch_csv(client, bundle):
     assert (low <= pred).all() and (pred <= high).all()
 
 
+def test_batch_keeps_columns_with_the_same_names(client):
+    df = pd.read_csv(EXAMPLE_CSV).head(5)
+    df["notes"] = "my own notes"
+    df[f"{TARGET}_prediction"] = 1.5
+    df["notes_2"] = "more notes"
+    r = _upload(client, df)
+    assert r.status_code == 200
+    out = pd.read_csv(io.BytesIO(r.data))
+    assert (out["notes"] == "my own notes").all() and (out["notes_2"] == "more notes").all()
+    assert (out[f"{TARGET}_prediction"] == 1.5).all()
+    assert list(out.columns[df.shape[1]:]) == [f"{TARGET}_prediction_2", f"{TARGET}_low", f"{TARGET}_high", "notes_3"]
+    assert (out[f"{TARGET}_low"] <= out[f"{TARGET}_prediction_2"]).all()
+
+
 def test_batch_reports_csv_line_numbers(client):
     df = pd.read_csv(EXAMPLE_CSV).head(5)
     df["age_years"] = df["age_years"].astype(object)

@@ -194,7 +194,9 @@ class Bundle:
         """Predict for a table read from a CSV file (CSV line numbers in errors).
 
         Returns a copy of ``df`` with ``<target>_prediction``, ``<target>_low``,
-        ``<target>_high`` and ``notes`` columns added.
+        ``<target>_high`` and ``notes`` columns added. When the file already has
+        a column with one of these names, the new column gets ``_2`` (or ``_3``,
+        and so on) at the end, so no input column is replaced.
         """
         absent = [n for n in self.feature_names if n not in df.columns]
         if absent:
@@ -202,11 +204,26 @@ class Bundle:
         results = self.predict(df.to_dict("records"), row_key="line", first_row=2)
         name = self.target["name"]
         out = df.copy()
-        out[f"{name}_prediction"] = [r["prediction"] for r in results]
-        out[f"{name}_low"] = [r["low"] for r in results]
-        out[f"{name}_high"] = [r["high"] for r in results]
-        out["notes"] = ["; ".join(r["notes"]) for r in results]
+        new_columns = {
+            f"{name}_prediction": [r["prediction"] for r in results],
+            f"{name}_low": [r["low"] for r in results],
+            f"{name}_high": [r["high"] for r in results],
+            "notes": ["; ".join(r["notes"]) for r in results],
+        }
+        for column, values in new_columns.items():
+            out[_free_name(column, out.columns)] = values
         return out
+
+
+def _free_name(name: str, taken: Sequence[Any]) -> str:
+    """``name``, or ``name_2``, ``name_3``, ... when that name is already taken."""
+    taken = {str(c) for c in taken}
+    if name not in taken:
+        return name
+    number = 2
+    while f"{name}_{number}" in taken:
+        number += 1
+    return f"{name}_{number}"
 
 
 def read_csv_for_prediction(source: Any) -> pd.DataFrame:
