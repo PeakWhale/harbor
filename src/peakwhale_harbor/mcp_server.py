@@ -49,7 +49,8 @@ def build_server(bundle: Bundle | str | Path) -> MCPServer:
         instructions=(
             f"This server predicts '{target}' with the Harbor model '{bundle.title}'. "
             "Call describe_model to learn the input fields and how accurate the model is, then call predict. "
-            f"Each prediction has a {pct}% range. Predictions are estimates, not financial or appraisal advice."
+            f"Each prediction has a {pct}% range. Predictions are estimates only: "
+            "check the range and the notes before acting on them."
         ),
     )
 

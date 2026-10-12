@@ -122,7 +122,7 @@ def test_home_page_has_generated_form(client, bundle):
         assert f'name="{name}"' in html
     assert "<select" in html and 'value="compressor"' in html
     assert "How good is this model?" in html
-    assert "not financial or appraisal advice" in html.lower()
+    assert "Estimates only" in html
 
 
 def test_form_shows_prediction_and_range(client, good_record):
