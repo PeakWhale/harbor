@@ -53,7 +53,7 @@ def print_metrics(metrics: dict, coverage: float) -> None:
     rows = [
         ("Typical error (MAE)", format_number(metrics["mae"])),
         ("Root mean squared error (RMSE)", format_number(metrics["rmse"])),
-        ("R² (1.0 is perfect)", f"{metrics['r2']:.3f}"),
+        ("R² (1.0 is perfect)", "n/a" if metrics["r2"] is None else f"{metrics['r2']:.3f}"),
         ("Simple guess error (median)", format_number(metrics["baseline_mae"])),
         (
             f"{round(coverage * 100)}% range: true value inside",

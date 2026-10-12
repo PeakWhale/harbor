@@ -77,7 +77,8 @@ def file_sha256(path: Path) -> str:
 
 
 def _write_json(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # allow_nan=False: NaN and Infinity are not valid JSON, so fail here instead of writing them.
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
 
 
 def _read_json(path: Path) -> dict[str, Any]:

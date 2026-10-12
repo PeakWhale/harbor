@@ -142,13 +142,14 @@ def match_category(value: Any, categories: Sequence[str]) -> str | None:
 
 
 def numeric_series(series: pd.Series) -> pd.Series:
-    """Convert a column to float. Values that are not numbers become NaN."""
-    if pd.api.types.is_bool_dtype(series):
-        return series.astype(float)
-    if pd.api.types.is_numeric_dtype(series):
-        return series.astype(float)
-    text = series.map(lambda v: None if is_missing(v) else str(v).strip())
-    return pd.to_numeric(text, errors="coerce").astype(float)
+    """Convert a column to float. Values that are not finite numbers become NaN."""
+    if pd.api.types.is_bool_dtype(series) or pd.api.types.is_numeric_dtype(series):
+        numbers = series.astype(float)
+    else:
+        text = series.map(lambda v: None if is_missing(v) else str(v).strip())
+        numbers = pd.to_numeric(text, errors="coerce").astype(float)
+    # "inf" and "-inf" are not usable numbers: treat them as empty.
+    return numbers.mask(np.isinf(numbers))
 
 
 def category_series(series: pd.Series) -> pd.Series:

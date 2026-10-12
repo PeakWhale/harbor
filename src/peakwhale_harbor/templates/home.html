@@ -253,7 +253,7 @@
                   <p class="statLabel">Error of a simple guess (median)</p>
                 </div>
                 <div class="stat">
-                  <p class="statValue">{{ metrics.r2|round(3) }}</p>
+                  <p class="statValue">{{ "n/a" if metrics.r2 is none else metrics.r2|round(3) }}</p>
                   <p class="statLabel">R² (1.0 is perfect)</p>
                 </div>
                 <div class="stat">

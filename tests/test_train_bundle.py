@@ -102,6 +102,44 @@ def test_non_negative_looks_at_every_row(tmp_path):
     assert b.target["min"] == -5.0
 
 
+def test_infinite_values_are_treated_as_empty(tmp_path):
+    df = mixed_frame(300)
+    df.loc[0, "target"] = np.inf
+    df.loc[1, "target"] = -np.inf
+    df.loc[2, "size"] = np.inf
+    df["price_text"] = df["price_text"].astype(object)
+    df.loc[3, "price_text"] = "-inf"
+    b = train(df, "target", tmp_path / "inf")
+    assert b.metadata["rows"]["skipped_missing_target"] == 2
+    f = {x["name"]: x for x in b.features}
+    assert np.isfinite(f["size"]["max"]) and "1 values were not numbers" in f["size"]["note"]
+    assert np.isfinite(f["price_text"]["min"])
+    for name in ("schema.json", "metrics.json", "metadata.json"):
+        json.loads((tmp_path / "inf" / name).read_text(), parse_constant=pytest.fail)
+
+
+def test_infinite_target_in_a_csv_file(tmp_path):
+    src = tmp_path / "data.csv"
+    df = mixed_frame(300)
+    df["target"] = df["target"].astype(object)
+    df.loc[0, "target"] = "inf"
+    df.to_csv(src, index=False)
+    b = train(src, "target", tmp_path / "inf")
+    assert b.metadata["rows"]["skipped_missing_target"] == 1
+
+
+def test_metric_that_cannot_be_computed_is_null(tmp_path):
+    # One test row: R² is not defined. It must not be written as NaN (not valid JSON).
+    with pytest.warns(UserWarning, match="R"):
+        b = train(mixed_frame(60), "target", tmp_path / "one", test_size=0.01)
+    assert b.metrics["test_rows"] == 1
+    assert b.metrics["r2"] is None
+    json.loads((tmp_path / "one" / "metrics.json").read_text(), parse_constant=pytest.fail)
+    from peakwhale_harbor.server import create_app
+
+    assert create_app(b).test_client().get("/").status_code == 200
+
+
 def test_unknown_target_suggests_a_column(tmp_path):
     with pytest.raises(TrainingError, match="Did you mean 'repair_hours'"):
         train(EXAMPLE_CSV, "repair_hour", tmp_path / "x")

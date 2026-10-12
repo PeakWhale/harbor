@@ -15,6 +15,7 @@ How it works, in short:
 
 from __future__ import annotations
 
+import math
 import platform
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
@@ -262,7 +263,8 @@ def train(
         "train_rows": int(len(train_idx)),
         "calibration_rows": int(len(cal_idx)),
         "test_rows": int(len(test_idx)),
-        **{k: round(v, 6) for k, v in scores.items()},
+        # A score that is not a finite number (for example R² with one test row) is stored as null.
+        **{k: round(v, 6) if math.isfinite(v) else None for k, v in scores.items()},
         "range_coverage_target": coverage,
         "baseline": "always predict the median of the training rows",
     }
