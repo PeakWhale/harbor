@@ -8,7 +8,7 @@ version = "2.0.0"
 description = "Turn a spreadsheet (CSV) into a prediction API with honest metrics and prediction ranges."
 readme = "README.md"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Aditya Rao (Addy) Kaveti" }]
 requires-python = ">=3.10"
 keywords = ["machine-learning", "tabular", "regression", "prediction-intervals", "flask", "api"]

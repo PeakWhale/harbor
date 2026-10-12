@@ -511,8 +511,7 @@ harbor/
 
 ## License
 
-Apache 2.0 License
-© 2025 PeakWhale™
+Apache License 2.0 © 2025-2026 Aditya Rao (Addy) Kaveti. See [LICENSE](LICENSE) and [NOTICE](NOTICE). If you share or build on Harbor, keep the NOTICE file. PeakWhale™ is Addy's project name; the license does not cover the name or logo.
 
 ## Author
 
