@@ -26,7 +26,11 @@ MAX_CATEGORIES = 250
 #: A text column counts as numeric when at least this share of values are numbers.
 NUMERIC_SHARE = 0.95
 #: Column names that usually hold row IDs, such as "id", "customer_id" or "Unnamed: 0".
-ID_NAME = re.compile(r"^(id|uuid|index|unnamed: ?\d+)$|[_\s]id$", re.IGNORECASE)
+ID_NAME = re.compile(r"^(id|uuid|index|unnamed: ?\d+)$|[_\s-]id$", re.IGNORECASE)
+#: Names written without a separator: CustomerID, PassengerId or customerId (but not "paid").
+ID_CAMEL = re.compile(r"(?<=[a-z])I[dD]$")
+#: Names such as order_no or invoice_number. Only used when every value is a different whole number.
+ID_NUMBER_NAME = re.compile(r"[_\s-](no|nr|num|number|code)$", re.IGNORECASE)
 #: Dates written with numbers only, with an optional time: 2024-01-31, 2024/01/31,
 #: 31/01/2024, 01-31-2024 or 1/5/2024 0:00.
 DATE_TEXT = re.compile(r"^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}([ T].*)?$|^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}([ T].*)?$")
@@ -245,16 +249,14 @@ def _guess_kind(name: str, values: pd.Series) -> tuple[str | None, str]:
     if pd.api.types.is_datetime64_any_dtype(values):
         return None, "dates are not supported yet (add columns such as year or month instead)"
     if pd.api.types.is_numeric_dtype(values):
-        if ID_NAME.search(name) and values.is_unique:
-            return None, "looks like an ID column (a different value in every row)"
-        return "numeric", ""
+        reason = _id_reason(name, values)
+        return (None, reason) if reason else ("numeric", "")
 
     text = values.astype(str).str.strip()
     numbers = pd.to_numeric(text.map(number_text), errors="coerce")
     if numbers.notna().mean() >= NUMERIC_SHARE:
-        if ID_NAME.search(name) and numbers.dropna().is_unique:
-            return None, "looks like an ID column (a different value in every row)"
-        return "numeric", ""
+        reason = _id_reason(name, numbers.dropna())
+        return (None, reason) if reason else ("numeric", "")
     if _looks_like_dates(text):
         return None, "looks like dates; dates are not supported yet (add columns such as year or month instead)"
     if text.str.match(DECIMAL_COMMA).mean() >= NUMERIC_SHARE:
@@ -266,6 +268,28 @@ def _guess_kind(name: str, values: pd.Series) -> tuple[str | None, str]:
     if unique > max(20, 0.5 * len(text)):
         return None, f"almost every row has a different value ({unique} different values); looks like IDs or free text"
     return "categorical", ""
+
+
+def _id_reason(name: str, numbers: pd.Series) -> str | None:
+    """Why a column of numbers looks like row IDs, or None when it does not.
+
+    Harbor can only guess from the name and the values. Check the printed
+    list after training, and use --drop for an ID that was not found.
+    """
+    if not numbers.is_unique:
+        return None
+    if ID_NAME.search(name) or ID_CAMEL.search(name):
+        return "looks like an ID column (a different value in every row)"
+    numbers = numbers.astype(float)
+    if not bool((numbers == numbers.round()).all()):
+        return None
+    if ID_NUMBER_NAME.search(name):
+        return "looks like an ID column (a different whole number in every row)"
+    # A row counter: 0 or 1, 2, 3, ... (a few rows may be missing).
+    low, high = float(numbers.min()), float(numbers.max())
+    if len(numbers) >= 20 and low in (0.0, 1.0) and len(numbers) >= 0.9 * (high - low + 1):
+        return "looks like a row number (1, 2, 3, ... with a different value in every row)"
+    return None
 
 
 def _looks_like_dates(text: pd.Series) -> bool:

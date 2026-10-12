@@ -80,6 +80,28 @@ def test_text_that_is_not_a_date_stays_categorical():
         assert f[name]["type"] == "categorical", name
 
 
+def test_number_id_columns_are_dropped():
+    df = mixed_frame()
+    rng = np.random.default_rng(3)
+    ids = rng.choice(np.arange(10_000, 99_999), len(df), replace=False)
+    for name in ("CustomerID", "PassengerId", "customerId", "order-id", "order_no", "invoice_number"):
+        df[name] = ids
+    df["row"] = rng.permutation(np.arange(1, len(df) + 1))
+    df["counter"] = [str(i) for i in range(len(df))]  # text that holds numbers
+    df["Paid"] = rng.uniform(0, 100, len(df))
+    df["VALID"] = rng.uniform(0, 100, len(df))
+    df["year"] = np.arange(1900, 1900 + len(df))
+    df["zip_code"] = rng.choice([94110, 94112, 10001], len(df))
+    features, dropped = infer_features(df, "target")
+    r = reasons(dropped)
+    for name in ("CustomerID", "PassengerId", "customerId", "order-id", "order_no", "invoice_number"):
+        assert "ID" in r[name], name
+    assert "row number" in r["row"] and "row number" in r["counter"]
+    f = by_name(features)
+    for name in ("Paid", "VALID", "year", "zip_code"):
+        assert f[name]["type"] == "numeric", name
+
+
 def test_user_overrides():
     features, dropped = infer_features(
         mixed_frame(), "target", categorical=["rooms"], drop=["size"], numeric=["flag"]
