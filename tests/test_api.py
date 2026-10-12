@@ -241,6 +241,29 @@ def test_upload_size_limit(bundle, monkeypatch):
     assert "too large" in r.get_json()["error"]
 
 
+@pytest.mark.parametrize("value", ["ten", "", "0", "-1", "nan"])
+def test_bad_upload_limit_is_a_clear_error(bundle, monkeypatch, value):
+    monkeypatch.setenv("HARBOR_MAX_UPLOAD_MB", value)
+    with pytest.raises(RuntimeError, match="HARBOR_MAX_UPLOAD_MB must be a number of megabytes"):
+        create_app(bundle)
+
+
+def test_upload_limit_can_be_a_fraction(bundle, monkeypatch):
+    monkeypatch.setenv("HARBOR_MAX_UPLOAD_MB", "0.5")
+    assert create_app(bundle).config["MAX_CONTENT_LENGTH"] == 512 * 1024
+
+
+@pytest.mark.parametrize("name, expected", [("données été.csv", "donnest"), ("日本.csv", "data"), ("a b-c_d.csv", "ab-c_d")])
+def test_batch_file_name_is_safe_for_http_headers(client, name, expected):
+    df = pd.read_csv(EXAMPLE_CSV).head(3)
+    data = {"file": (io.BytesIO(df.to_csv(index=False).encode()), name)}
+    r = client.post("/predict_batch", data=data, content_type="multipart/form-data")
+    assert r.status_code == 200
+    header = r.headers["Content-Disposition"]
+    header.encode("latin-1")
+    assert f'filename="{expected}_predictions.csv"' in header
+
+
 def test_app_reads_bundle_from_environment(bundle_dir, monkeypatch):
     monkeypatch.setenv("HARBOR_BUNDLE", str(bundle_dir))
     assert create_app().test_client().get("/health").status_code == 200

@@ -126,7 +126,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     try:
         app = create_app(args.bundle)
-    except BundleError as exc:
+    except (BundleError, RuntimeError) as exc:  # RuntimeError: a bad setting such as HARBOR_MAX_UPLOAD_MB
         return _error(str(exc))
     print(f"Serving {args.bundle} on http://{args.host}:{args.port}  (press Ctrl+C to stop)")
     app.run(host=args.host, port=args.port, debug=False)

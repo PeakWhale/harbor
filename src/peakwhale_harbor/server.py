@@ -8,6 +8,7 @@ Run it with ``harbor serve <bundle>`` for local use, or with Gunicorn::
 from __future__ import annotations
 
 import io
+import math
 import os
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,17 @@ def _csv_response(df: pd.DataFrame, filename: str) -> Response:
     )
 
 
+def _upload_limit_mb() -> float:
+    text = os.environ.get("HARBOR_MAX_UPLOAD_MB", "10")
+    try:
+        mb = float(text)
+    except ValueError:
+        mb = math.nan
+    if not (math.isfinite(mb) and mb > 0):
+        raise RuntimeError(f"HARBOR_MAX_UPLOAD_MB must be a number of megabytes, such as 10 (got {text!r}).")
+    return mb
+
+
 def create_app(bundle: Bundle | str | Path | None = None) -> Flask:
     """Build the app. ``bundle`` is a Bundle or a folder path.
 
@@ -50,8 +62,9 @@ def create_app(bundle: Bundle | str | Path | None = None) -> Flask:
     if not isinstance(bundle, Bundle):
         bundle = load_bundle(bundle)
 
+    upload_mb = _upload_limit_mb()
     app = Flask(__name__)
-    app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("HARBOR_MAX_UPLOAD_MB", "10")) * 1024 * 1024
+    app.config["MAX_CONTENT_LENGTH"] = int(upload_mb * 1024 * 1024)
     app.json.sort_keys = False
     app.extensions["harbor_bundle"] = bundle
     app.jinja_env.filters["num"] = format_number
@@ -167,7 +180,8 @@ def create_app(bundle: Bundle | str | Path | None = None) -> Flask:
             out = bundle.predict_table(df)
         except InputError as exc:
             return fail(exc.message, exc.problems)
-        stem = "".join(c for c in Path(upload.filename).stem if c.isalnum() or c in "-_") or "data"
+        # ASCII only: HTTP headers cannot hold other characters (a file named "données.csv" gives "donnes").
+        stem = "".join(c for c in Path(upload.filename).stem if c.isascii() and (c.isalnum() or c in "-_")) or "data"
         return _csv_response(out, f"{stem}_predictions.csv")
 
     @app.get("/template.csv")
@@ -176,7 +190,6 @@ def create_app(bundle: Bundle | str | Path | None = None) -> Flask:
 
     @app.errorhandler(413)
     def too_large(_exc):
-        limit = app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024)
-        return jsonify(error=f"The upload is too large. The limit is {limit} MB."), 413
+        return jsonify(error=f"The upload is too large. The limit is {upload_mb:g} MB."), 413
 
     return app
