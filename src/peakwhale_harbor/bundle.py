@@ -276,6 +276,15 @@ def predict_with_range(models: Mapping[str, Any], frame: pd.DataFrame, non_negat
     return {"prediction": point, "low": low, "high": high}
 
 
+def check_out_folder(path: Path) -> None:
+    """Refuse an output path that is a file, or a folder with other things in it."""
+    path = Path(path)
+    if path.exists() and not path.is_dir():
+        raise BundleError(f"{path} is a file, not a folder. Choose another --out folder.")
+    if path.is_dir() and any(path.iterdir()) and not is_bundle(path):
+        raise BundleError(f"{path} already exists and is not a Harbor bundle. Choose another --out folder.")
+
+
 def save_bundle(
     path: Path,
     *,
@@ -285,8 +294,7 @@ def save_bundle(
     metadata: Mapping[str, Any],
 ) -> Path:
     path = Path(path)
-    if path.exists() and any(path.iterdir()) and not is_bundle(path):
-        raise BundleError(f"{path} already exists and is not a Harbor bundle. Choose another --out folder.")
+    check_out_folder(path)
     path.mkdir(parents=True, exist_ok=True)
     model_path = path / MODEL_FILE
     sio.dump(dict(models), model_path, compression=8)

@@ -35,7 +35,16 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
 
 from . import __version__
-from .bundle import BUNDLE_FORMAT, FORMAT_VERSION, Bundle, file_sha256, load_bundle, predict_with_range, save_bundle
+from .bundle import (
+    BUNDLE_FORMAT,
+    FORMAT_VERSION,
+    Bundle,
+    check_out_folder,
+    file_sha256,
+    load_bundle,
+    predict_with_range,
+    save_bundle,
+)
 from .csvfile import read_csv
 from .schema import (
     DECIMAL_COMMA,
@@ -75,6 +84,15 @@ def read_table(path: str | Path, log: Callable[[str], None] | None = None) -> pd
     if duplicated:
         raise TrainingError(f"column names must be unique, these repeat: {duplicated}")
     return df
+
+
+def source_stem(name: str) -> str:
+    """A file name without .csv, .tsv or .gz: "sales.2024.csv.gz" gives "sales.2024"."""
+    stem = name[:-3] if name.lower().endswith(".gz") else name
+    for suffix in (".csv", ".tsv", ".tab", ".txt"):
+        if stem.lower().endswith(suffix):
+            return stem[: -len(suffix)]
+    return stem
 
 
 def _title_from(name: str) -> str:
@@ -174,6 +192,7 @@ def train(
         raise TrainingError("coverage must be at least 0.5 and below 1 (for example 0.9 for a 90% range)")
     if not (0 < test_size < 0.5 and 0 < calibration_size < 0.5 and test_size + calibration_size <= 0.6):
         raise TrainingError("test and calibration sizes must each be between 0 and 0.5, and together at most 0.6")
+    check_out_folder(Path(out))  # before training, so a bad --out fails fast
 
     source: dict[str, Any] = {"file": None, "sha256": None}
     if isinstance(data, pd.DataFrame):
@@ -184,7 +203,7 @@ def train(
         df = read_table(path, log=say)
         source = {"file": path.name, "sha256": file_sha256(path)}
         if title is None:
-            title = _title_from(path.name.split(".")[0])
+            title = _title_from(source_stem(path.name))
     source.update({"rows": int(len(df)), "columns": int(df.shape[1])})
     title = title or _title_from(str(target)) + " model"
     descriptions = dict(descriptions or {})

@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import pytest
 
-from conftest import EXAMPLE_CSV, TARGET
+from conftest import EXAMPLE_CSV, TARGET, mixed_frame
 from peakwhale_harbor.cli import main
 
 
@@ -22,6 +22,32 @@ def test_train_command_errors(tmp_path, capsys):
     code = main(["train", str(EXAMPLE_CSV), "--target", "nope", "--out", str(tmp_path / "x")])
     assert code == 1
     assert "not in the file" in capsys.readouterr().err
+
+
+def test_default_out_folder(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    data = mixed_frame(100)
+    data.to_csv("sales.2024.csv", index=False)
+    assert main(["train", "sales.2024.csv", "--target", "target"]) == 0
+    assert (tmp_path / "models" / "sales-2024" / "model.skops").is_file()
+    capsys.readouterr()
+    assert main(["info", "models/sales-2024", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["title"] == "Sales.2024"
+    # The same file again replaces its own model.
+    assert main(["train", "sales.2024.csv", "--target", "target"]) == 0
+    # Another file that gives the same folder name does not.
+    data.to_csv("Sales 2024.csv", index=False)
+    capsys.readouterr()
+    assert main(["train", "Sales 2024.csv", "--target", "target"]) == 1
+    assert "trained from sales.2024.csv" in capsys.readouterr().err
+
+
+def test_out_that_is_a_file(tmp_path, capsys):
+    out = tmp_path / "model.txt"
+    out.write_text("keep me")
+    assert main(["train", str(EXAMPLE_CSV), "--target", TARGET, "--out", str(out)]) == 1
+    assert "is a file, not a folder" in capsys.readouterr().err
+    assert out.read_text() == "keep me"
 
 
 def test_predict_command(bundle_dir, tmp_path):

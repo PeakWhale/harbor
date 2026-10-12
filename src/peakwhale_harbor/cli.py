@@ -18,10 +18,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import __version__
-from .bundle import BundleError, load_bundle, read_csv_for_prediction
+from .bundle import METADATA_FILE, BundleError, load_bundle, read_csv_for_prediction
 from .formatting import format_number, format_percent
 from .schema import InputError
-from .train import DEFAULT_COVERAGE, DEFAULT_SEED, TrainingError, train
+from .train import DEFAULT_COVERAGE, DEFAULT_SEED, TrainingError, source_stem, train
 
 
 def _names(values: Sequence[str] | None) -> list[str]:
@@ -34,6 +34,15 @@ def _names(values: Sequence[str] | None) -> list[str]:
 
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "model"
+
+
+def _trained_from(folder: Path) -> str | None:
+    """The source file name of the bundle in ``folder``, if there is one."""
+    try:
+        meta = json.loads((folder / METADATA_FILE).read_text(encoding="utf-8"))
+        return meta["source"]["file"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 
 def _error(message: str) -> int:
@@ -75,7 +84,15 @@ def cmd_train(args: argparse.Namespace) -> int:
             return _error(f"cannot read --descriptions file: {exc}")
         if not isinstance(descriptions, dict):
             return _error("--descriptions must be a JSON object: {\"column\": \"description\"}")
-    out = Path(args.out) if args.out else Path("models") / _slug(Path(args.csv).name.split(".")[0])
+    out = Path(args.out) if args.out else Path("models") / _slug(source_stem(Path(args.csv).name))
+    if not args.out:
+        # Two files can give the same folder name ("My Data.csv", "my-data.csv"). Do not replace the other model.
+        trained_from = _trained_from(out)
+        if trained_from and trained_from != Path(args.csv).name:
+            return _error(
+                f"{out} already holds a model trained from {trained_from}. "
+                f"Choose a folder with --out (or use --out {out} to replace that model)."
+            )
     print(f"Training on {args.csv}, target column: {args.target}")
     try:
         bundle = train(
