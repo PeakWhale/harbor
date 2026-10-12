@@ -30,6 +30,9 @@ server = ["gunicorn>=22"]
 mcp = ["mcp>=2,<3"]
 dev = ["pytest>=8", "mcp>=2,<3"]
 
+[project.scripts]
+harbor = "peakwhale_harbor.cli:main"
+
 [project.urls]
 Source = "https://github.com/PeakWhale/harbor"
 
