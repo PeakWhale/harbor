@@ -240,3 +240,19 @@ def test_conformal_offset():
     assert conformal_offset(low, high, y, 0.8) == pytest.approx(-1.0)
     high[0] = -3  # one true value is 3 above the band
     assert conformal_offset(low, high, y, 0.95) == pytest.approx(3.0)
+
+
+def test_predictions_use_one_openmp_thread():
+    """Many OpenMP threads make single predictions very slow on a busy computer."""
+    from threadpoolctl import threadpool_info
+
+    seen = []
+
+    class Spy(Fixed):
+        def predict(self, frame):
+            seen.extend(i["num_threads"] for i in threadpool_info() if i["user_api"] == "openmp")
+            return self.values
+
+    models = {"point": Spy([1.0]), "low": Spy([0.5]), "high": Spy([2.0]), "range_offset": 0.0}
+    predict_with_range(models, pd.DataFrame(index=range(1)), non_negative=False)
+    assert seen and set(seen) == {1}

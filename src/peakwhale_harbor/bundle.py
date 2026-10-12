@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 import sklearn
 import skops.io as sio
+from threadpoolctl import ThreadpoolController
 
 from .schema import InputError, check_records, example_record
 
@@ -214,11 +215,28 @@ def read_csv_for_prediction(source: Any) -> pd.DataFrame:
     return df
 
 
+_threadpools: ThreadpoolController | None = None
+
+
+def _one_thread():
+    """Run model predictions on one OpenMP thread.
+
+    By default scikit-learn uses one thread per CPU even for a single row. On a
+    busy computer, or with several server workers, those threads wait for each
+    other and a prediction can take seconds instead of milliseconds.
+    """
+    global _threadpools
+    if _threadpools is None:
+        _threadpools = ThreadpoolController()
+    return _threadpools.limit(limits=1, user_api="openmp")
+
+
 def predict_with_range(models: Mapping[str, Any], frame: pd.DataFrame, non_negative: bool) -> dict[str, np.ndarray]:
-    point = np.asarray(models["point"].predict(frame), dtype=float)
-    offset = float(models["range_offset"])
-    low = np.asarray(models["low"].predict(frame), dtype=float) - offset
-    high = np.asarray(models["high"].predict(frame), dtype=float) + offset
+    with _one_thread():
+        point = np.asarray(models["point"].predict(frame), dtype=float)
+        offset = float(models["range_offset"])
+        low = np.asarray(models["low"].predict(frame), dtype=float) - offset
+        high = np.asarray(models["high"].predict(frame), dtype=float) + offset
     # Quantile models can cross. Sort the two ends.
     low, high = np.minimum(low, high), np.maximum(low, high)
     if non_negative:

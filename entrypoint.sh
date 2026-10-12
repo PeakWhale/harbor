@@ -2,6 +2,8 @@
 set -eu
 
 PORT="${PORT:-8000}"
+# One OpenMP thread per request. The workers and threads below already use the CPUs.
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 
 # HARBOR_BUNDLE picks the bundle folder (default: the California housing demo).
 exec gunicorn \
