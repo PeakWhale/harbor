@@ -6,16 +6,20 @@ on:
   pull_request:
     branches: [main]
 
+# Read only by default. Only the publish job may write packages.
 permissions:
   contents: read
-  packages: write
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      OMP_NUM_THREADS: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,6 +40,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Build Docker image
         run: docker build -t harbor:ci .
@@ -67,9 +73,14 @@ jobs:
     needs: build_and_smoke_test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
