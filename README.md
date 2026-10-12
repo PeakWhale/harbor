@@ -47,7 +47,18 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-**2. Train the demo model** (California housing data, about 10 seconds)
+On Windows (Command Prompt), create and start the environment like this instead:
+
+```bat
+py -m venv .venv
+.venv\Scripts\activate
+pip install -e .
+```
+
+The longer commands below are split over several lines with `\` for macOS and Linux.
+On Windows, type each one on a single line without the `\`.
+
+**2. Train the demo model** (California housing data, usually well under a minute)
 
 ```bash
 harbor train data/california_housing.csv --target median_house_value \
@@ -64,8 +75,13 @@ harbor serve models/california-housing
 Open <http://127.0.0.1:5050>. Change some values and click **Predict**.
 (Use `--port` to pick another port.)
 
+If training or predictions are very slow on a busy computer, run with
+`OMP_NUM_THREADS=1`, for example `OMP_NUM_THREADS=1 harbor train ...`
+(on Windows, run `set OMP_NUM_THREADS=1` first). Harbor already uses one thread
+for predictions, and the Docker image sets this for you.
+
 Prefer Docker? Run `docker build -t peakwhale-harbor .` and then
-`docker run -p 8000:8000 peakwhale-harbor`. Open <http://localhost:8000>.
+`docker run -p 127.0.0.1:8000:8000 peakwhale-harbor`. Open <http://localhost:8000>.
 
 ## Bring Your Own CSV
 
@@ -88,9 +104,20 @@ Harbor looks at every column and decides what to do with it:
 | --- | --- |
 | Numbers | Uses it as a **numeric** input. Empty cells are fine. |
 | A few different text values (like "north", "south") | Uses it as a **categorical** input. |
-| A different value in almost every row (IDs, names, free text) | Skips it and tells you why. |
-| Dates | Skips it. Add columns like `year` or `month` instead. |
+| A different text value in almost every row (codes, names, free text) | Skips it and tells you why. |
+| Number IDs (see below) | Skips it and tells you why. |
+| Dates, such as `2024-01-31`, `31/01/2024`, `1/5/2024 0:00`, `Jan 5, 2024` or `Jan 2024` | Skips it. Add columns like `year` or `month` instead. |
 | Only empty cells, or the same value in every row | Skips it. |
+
+Spreadsheet number formats are fine: `$1,234.50`, `2,092` and `12%` are read as
+1234.5, 2092 and 12. Cells such as `-`, `?` or `#DIV/0!` in a number column count as
+empty, both in training and in predictions. Numbers need a decimal point (`2.5`), not a
+decimal comma (`2,5`).
+
+Harbor finds number IDs only by their name (such as `id`, `customer_id`, `CustomerID`
+or `order_no`) or when they simply count the rows (1, 2, 3, ...). An ID with another
+name looks like a normal number to Harbor. **Check the printed list after training**,
+and use `--drop` for any ID column that Harbor did not skip.
 
 Harbor prints its choices. If a choice is wrong, change it:
 
@@ -126,7 +153,14 @@ harbor info models/equipment-repairs                      # inputs and test resu
 harbor predict models/equipment-repairs new_rows.csv --out predictions.csv
 ```
 
-Excel file? Save it as CSV first (File > Save As > CSV).
+`new_rows.csv` is your own CSV file with the same input columns as the training file
+(the target column is not needed). The `/template.csv` page of the web app gives you
+one with the right columns. To try it now, use `examples/equipment_repairs.csv` itself.
+
+Excel file? Save it as CSV first: File > Save As > **CSV UTF-8 (Comma delimited)**.
+Harbor also reads older "CSV (Comma delimited)" files, files with `;` between the
+columns (Excel in many European languages) and `.tsv` files. `harbor train` and
+`harbor predict` say so when a file is not UTF-8 text.
 
 ## What Is in a Model Bundle
 
@@ -150,7 +184,9 @@ of extra types. Harbor also checks the file against the SHA-256 checksum in
 > yourself or that come from someone you trust.
 
 A bundle works best with the same library versions that trained it. Harbor warns
-you when the scikit-learn version is different. In that case, train again.
+you when the scikit-learn version is different. If a bundle cannot be loaded at all,
+Harbor names the versions that trained it and the ones you have. In both cases,
+install the versions in `requirements.txt` or train again.
 
 ## API
 
@@ -191,8 +227,8 @@ The answer looks like this (numbers shortened):
 ```json
 {
   "prediction": 440721.9,
-  "low": 309631.6,
-  "high": 508067.3,
+  "low": 309652.8,
+  "high": 508046.1,
   "coverage": 0.9,
   "notes": [],
   "target": {"name": "median_house_value", "description": "Median house value in the district, ..."}
@@ -234,8 +270,10 @@ curl -F file=@template.csv http://localhost:5050/predict_batch -o predictions.cs
 ```
 
 You get your file back with four new columns: `<target>_prediction`, `<target>_low`,
-`<target>_high` and `notes`. Errors give the CSV line number. Uploads are limited to
-10 MB (set `HARBOR_MAX_UPLOAD_MB` to change this).
+`<target>_high` and `notes`. If your file already has a column with one of these names,
+the new column gets `_2` at the end, so none of your columns are replaced. Errors give
+the CSV line number. Uploads are limited to 10 MB (set `HARBOR_MAX_UPLOAD_MB` to change
+this), 100,000 rows and 1,000 columns.
 
 ## How the Ranges Work
 
@@ -264,8 +302,8 @@ tells you to be careful.
 ## Demo Results (Measured)
 
 These numbers come from the commands below, run with the versions in
-`requirements.txt` (Python 3.11). The Docker build runs the same command and printed
-the same numbers. All numbers are measured on test rows that the model never saw.
+`requirements.txt` (Python 3.11). The Docker build runs the same command with the same
+versions. All numbers are measured on test rows that the model never saw.
 
 **California housing** (20,640 rows, 4,128 test rows):
 
@@ -282,7 +320,7 @@ Hold-out test results (4,128 rows the model never saw):
   R² (1.0 is perfect)                0.835
   Simple guess error (median)        87,404
   90% range: true value inside       90.0% of test rows
-  Average range width                142,583
+  Average range width                142,540
 ```
 
 The values are in US dollars of 1990. The "simple guess" always predicts the median
@@ -301,7 +339,7 @@ Hold-out test results (240 rows the model never saw):
   R² (1.0 is perfect)                0.661
   Simple guess error (median)        11.92
   90% range: true value inside       87.1% of test rows
-  Average range width                23.58
+  Average range width                23.56
 ```
 
 With only 240 test rows, the measured share moves around by a few points. Here it is
@@ -339,6 +377,9 @@ it for you. Add it to your assistant's MCP settings (for example
 }
 ```
 
+On Windows, the command is `C:\\full\\path\\to\\harbor\\.venv\\Scripts\\harbor.exe` (in JSON,
+every `\` is written twice).
+
 ## Docker
 
 The image trains the California demo model while it builds. Then it serves the model
@@ -346,20 +387,35 @@ with Gunicorn on port 8000.
 
 ```bash
 docker build -t peakwhale-harbor .
-docker run --name harbor -p 8000:8000 -e PORT=8000 peakwhale-harbor
+docker run --name harbor -p 127.0.0.1:8000:8000 -e PORT=8000 peakwhale-harbor
 ```
+
+`-p 127.0.0.1:8000:8000` makes the app reachable only from your own computer. The API
+has no login. Before you open it to other computers, put it behind a reverse proxy that
+asks for a login.
 
 To serve your own bundle, mount it and set `HARBOR_BUNDLE`:
 
 ```bash
-docker run -p 8000:8000 \
+docker run -p 127.0.0.1:8000:8000 \
   -v "$PWD/models/my-model:/bundle:ro" \
   -e HARBOR_BUNDLE=/bundle \
   peakwhale-harbor
 ```
 
+The image has the exact versions in `requirements.txt` (Python 3.11). Train the bundle
+with the same versions (`pip install -r requirements.txt -e .` on Python 3.11), or the
+image may not be able to load it. You can also train inside the image:
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work \
+  --entrypoint harbor peakwhale-harbor \
+  train my_data.csv --target price --out models/my-model
+```
+
 Settings: `PORT` (default 8000), `WORKERS` (Gunicorn workers, default 2),
-`HARBOR_BUNDLE` and `HARBOR_MAX_UPLOAD_MB`. The container runs as a normal user, not root.
+`HARBOR_BUNDLE`, `HARBOR_MAX_UPLOAD_MB` and `OMP_NUM_THREADS` (default 1). The container
+runs as a normal user, not root.
 
 ## Run from GHCR
 
@@ -372,7 +428,7 @@ the `read:packages` permission:
 ```bash
 docker login ghcr.io -u YOUR_GITHUB_USERNAME
 docker pull ghcr.io/peakwhale/harbor:latest
-docker run --name harbor -p 8000:8000 -e PORT=8000 ghcr.io/peakwhale/harbor:latest
+docker run --name harbor -p 127.0.0.1:8000:8000 -e PORT=8000 ghcr.io/peakwhale/harbor:latest
 ```
 
 ## Honest Limits
@@ -381,7 +437,8 @@ docker run --name harbor -p 8000:8000 -e PORT=8000 ghcr.io/peakwhale/harbor:late
   you what a home is worth today.
 * **Numbers only.** Harbor predicts a number (regression). Yes/no or category targets
   are not supported yet.
-* **No dates or free text.** Harbor skips these columns.
+* **No dates or free text.** Harbor skips these columns. It knows the common date
+  formats; a date written another way may be read as a category, so check the list.
 * **New data can be different.** Test results and ranges hold for rows that look like
   the training rows. A number outside the training range gets a note, because the
   model cannot extrapolate.
@@ -412,6 +469,9 @@ pip install -r requirements.txt -e ".[dev]"
 pytest
 ```
 
+`requirements.txt` holds the exact versions for Docker and CI, and they need Python
+3.11 or newer. On Python 3.10, install without it: `pip install -e ".[dev]"`.
+
 The tests cover column type inference, train → save → load → predict, the API
 endpoints, CSV batch files, bad input, the MCP server, and the rule that every range
 contains its prediction.
@@ -422,6 +482,7 @@ contains its prediction.
 harbor/
   src/peakwhale_harbor/
     cli.py           the harbor command
+    csvfile.py       read CSV files (separators, encodings)
     schema.py        column types and input checks
     train.py         training, ranges and metrics
     bundle.py        save and load bundles, predictions
@@ -442,11 +503,11 @@ harbor/
 
 ## Part of the PeakWhale™ Ecosystem
 
-* PeakWhale™ Helm, multi agent financial intelligence
-* PeakWhale™ Orca, real time fraud detection
-* PeakWhale™ Harbor, turn a spreadsheet into a prediction API
-* PeakWhale™ Trident
-* PeakWhale™ Berth, EV fleet charging planner
+* **PeakWhale™ Helm**: research assistant over your own data.
+* **PeakWhale™ Orca**: real-time fraud detection.
+* **PeakWhale™ Harbor**: turn a spreadsheet into a prediction API.
+* **PeakWhale™ Trident**: fail-safe triage engine, AI plus editable rules; unclear cases go to a person.
+* **PeakWhale™ Berth**: EV fleet charging planner.
 
 ## License
 
