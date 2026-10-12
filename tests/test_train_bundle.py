@@ -265,6 +265,28 @@ def test_untrusted_types_are_refused(copy_of_bundle):
         load_bundle(copy_of_bundle)
 
 
+def test_model_file_that_cannot_be_loaded(copy_of_bundle, monkeypatch):
+    import peakwhale_harbor.bundle as bundle_module
+
+    def broken(*args, **kwargs):
+        raise AttributeError("Can't get attribute 'Something' on <module 'sklearn...'>")
+
+    monkeypatch.setattr(bundle_module.sio, "load", broken)
+    with pytest.raises(BundleError, match=r"trained with scikit-learn .* train the bundle again"):
+        load_bundle(copy_of_bundle)
+
+
+def test_broken_model_file_is_a_bundle_error(copy_of_bundle):
+    model = copy_of_bundle / MODEL_FILE
+    model.write_bytes(b"not a zip file")
+    meta_path = copy_of_bundle / "metadata.json"
+    meta = json.loads(meta_path.read_text())
+    meta["model_sha256"] = file_sha256(model)
+    meta_path.write_text(json.dumps(meta))
+    with pytest.raises(BundleError, match="cannot load"):
+        load_bundle(copy_of_bundle)
+
+
 def test_folder_that_is_not_a_bundle(tmp_path):
     with pytest.raises(BundleError, match="not found"):
         load_bundle(tmp_path / "nothing-here")

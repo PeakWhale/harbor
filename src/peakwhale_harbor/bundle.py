@@ -27,6 +27,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import sklearn
+import skops
 import skops.io as sio
 from threadpoolctl import ThreadpoolController
 
@@ -325,15 +326,25 @@ def load_bundle(path: str | Path) -> Bundle:
     if expected and file_sha256(model_path) != expected:
         raise BundleError(f"{model_path} does not match the checksum in {METADATA_FILE}. The file was changed.")
 
+    versions = metadata.get("versions") or {}
+    trained_with = versions.get("scikit-learn")
+
+    def cannot_load(exc: Exception) -> BundleError:
+        # Usually a file made with other library versions. Say which ones, and how to fix it.
+        return BundleError(
+            f"cannot load {model_path}: {exc}. It was trained with scikit-learn {trained_with or 'unknown'} "
+            f"and skops {versions.get('skops', 'unknown')}; this computer has scikit-learn {sklearn.__version__} "
+            f"and skops {skops.__version__}. Install the versions in requirements.txt, or train the bundle again."
+        )
+
     try:
         untrusted = sio.get_untrusted_types(file=model_path)
-    except Exception as exc:  # broken zip file and similar
-        raise BundleError(f"cannot read {model_path}: {exc}") from None
+    except Exception as exc:  # broken zip file, a file from another skops version and similar
+        raise cannot_load(exc) from None
     unexpected = sorted(set(untrusted) - EXTRA_TRUSTED_TYPES)
     if unexpected:
         raise BundleError(f"refusing to load {model_path}: it contains types Harbor does not trust: {unexpected}")
 
-    trained_with = metadata.get("versions", {}).get("scikit-learn")
     if trained_with and trained_with != sklearn.__version__:
         warnings.warn(
             f"{path.name} was trained with scikit-learn {trained_with}, but {sklearn.__version__} is installed. "
@@ -341,7 +352,12 @@ def load_bundle(path: str | Path) -> Bundle:
             VersionWarning,
             stacklevel=2,
         )
-    models = sio.load(model_path, trusted=list(untrusted))
+    try:
+        models = sio.load(model_path, trusted=list(untrusted))
+    except Exception as exc:
+        raise cannot_load(exc) from None
+    if not isinstance(models, dict):
+        raise BundleError(f"{model_path} does not hold Harbor models")
     missing = {"point", "low", "high", "range_offset"} - set(models)
     if missing:
         raise BundleError(f"{model_path} is incomplete, missing: {sorted(missing)}")
