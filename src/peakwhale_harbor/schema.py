@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 import re
+import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from difflib import get_close_matches
 from typing import Any
@@ -26,7 +27,17 @@ MAX_CATEGORIES = 250
 NUMERIC_SHARE = 0.95
 #: Column names that usually hold row IDs, such as "id", "customer_id" or "Unnamed: 0".
 ID_NAME = re.compile(r"^(id|uuid|index|unnamed: ?\d+)$|[_\s]id$", re.IGNORECASE)
-DATE_TEXT = re.compile(r"^\d{4}-\d{1,2}-\d{1,2}([ T].*)?$|^\d{1,2}[/.]\d{1,2}[/.]\d{2,4}$")
+#: Dates written with numbers only, with an optional time: 2024-01-31, 2024/01/31,
+#: 31/01/2024, 01-31-2024 or 1/5/2024 0:00.
+DATE_TEXT = re.compile(r"^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}([ T].*)?$|^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}([ T].*)?$")
+#: A month name or a four-digit year: the values worth a closer look as dates ("Jan 5, 2024").
+DATE_HINT = re.compile(
+    r"(?<![a-z])(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?"
+    r"|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?![a-z])|(?<!\d)\d{4}(?!\d)",
+    re.IGNORECASE,
+)
+#: At most this many different values are tried as dates per column (date parsing is slow).
+DATE_SAMPLE = 1000
 #: Currency signs that spreadsheets put before (or after) a number.
 CURRENCY_SIGNS = "$€£¥₹"
 #: Thousands separated by commas: 1,234 or 1,234,567.89.
@@ -244,7 +255,7 @@ def _guess_kind(name: str, values: pd.Series) -> tuple[str | None, str]:
         if ID_NAME.search(name) and numbers.dropna().is_unique:
             return None, "looks like an ID column (a different value in every row)"
         return "numeric", ""
-    if text.str.match(DATE_TEXT).mean() >= NUMERIC_SHARE:
+    if _looks_like_dates(text):
         return None, "looks like dates; dates are not supported yet (add columns such as year or month instead)"
     if text.str.match(DECIMAL_COMMA).mean() >= NUMERIC_SHARE:
         return None, DECIMAL_COMMA_HINT
@@ -255,6 +266,20 @@ def _guess_kind(name: str, values: pd.Series) -> tuple[str | None, str]:
     if unique > max(20, 0.5 * len(text)):
         return None, f"almost every row has a different value ({unique} different values); looks like IDs or free text"
     return "categorical", ""
+
+
+def _looks_like_dates(text: pd.Series) -> bool:
+    """True when almost every value is a date, such as 2024-01-31, 5-Jan-24 or Jan 2024."""
+    if text.str.match(DATE_TEXT).mean() >= NUMERIC_SHARE:
+        return True
+    sample = pd.Series(text.unique()[:DATE_SAMPLE], dtype=object)
+    # Only values with a digit and a month name or a year: "Jan", "Mon" or "18-24" are not dates here.
+    if (sample.str.contains(r"\d") & sample.str.contains(DATE_HINT)).mean() < NUMERIC_SHARE:
+        return False
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        parsed = pd.to_datetime(sample, errors="coerce", format="mixed")
+    return bool(parsed.notna().mean() >= NUMERIC_SHARE)
 
 
 def _check_names(kind: str, names: Iterable[str], columns: Sequence[str]) -> list[str]:

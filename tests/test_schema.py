@@ -58,6 +58,28 @@ def test_drops_columns_that_cannot_help():
     assert "dates" in r["day"]
 
 
+@pytest.mark.parametrize(
+    "fmt",
+    ["%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y 0:00", "%b %d, %Y", "%d-%b-%y", "%B %Y", "%Y-%m-%d %H:%M"],
+)
+def test_common_date_formats_are_dropped(fmt):
+    df = mixed_frame()
+    df["when"] = pd.date_range("2001-01-01", periods=len(df), freq="MS").strftime(fmt)
+    assert "dates" in reasons(infer_features(df, "target")[1])["when"]
+
+
+def test_text_that_is_not_a_date_stays_categorical():
+    df = mixed_frame()
+    rng = np.random.default_rng(2)
+    df["month"] = rng.choice(["Jan", "Feb", "Mar"], len(df))
+    df["weekday"] = rng.choice(["Mon", "Tue", "Sat"], len(df))
+    df["age_group"] = rng.choice(["18-24", "25-34", "35-44"], len(df))
+    df["season"] = rng.choice(["2019-2020", "2020-2021"], len(df))
+    f = by_name(infer_features(df, "target")[0])
+    for name in ("month", "weekday", "age_group", "season"):
+        assert f[name]["type"] == "categorical", name
+
+
 def test_user_overrides():
     features, dropped = infer_features(
         mixed_frame(), "target", categorical=["rooms"], drop=["size"], numeric=["flag"]
