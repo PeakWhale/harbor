@@ -27,6 +27,18 @@ NUMERIC_SHARE = 0.95
 #: Column names that usually hold row IDs, such as "id", "customer_id" or "Unnamed: 0".
 ID_NAME = re.compile(r"^(id|uuid|index|unnamed: ?\d+)$|[_\s]id$", re.IGNORECASE)
 DATE_TEXT = re.compile(r"^\d{4}-\d{1,2}-\d{1,2}([ T].*)?$|^\d{1,2}[/.]\d{1,2}[/.]\d{2,4}$")
+#: Currency signs that spreadsheets put before (or after) a number.
+CURRENCY_SIGNS = "$€£¥₹"
+#: Thousands separated by commas: 1,234 or 1,234,567.89.
+GROUPED_NUMBER = re.compile(r"^\d{1,3}(,\d{3})+(\.\d*)?$")
+#: A decimal comma, as many European spreadsheets write numbers: 2,5 or -0,75.
+DECIMAL_COMMA = re.compile(r"^[+-]?\d+,\d+$")
+DECIMAL_COMMA_HINT = (
+    "looks like numbers with a decimal comma (such as 2,5); Harbor needs a decimal point (2.5). "
+    "Change the number format or the file's language settings and save the CSV again"
+)
+#: At most this many placeholder values ("-", "?", "#DIV/0!") are remembered per numeric column.
+MAX_MISSING_TOKENS = 20
 #: Only this many problems are listed in one error message.
 MAX_PROBLEMS = 50
 
@@ -65,14 +77,44 @@ def is_missing(value: Any) -> bool:
     return False
 
 
-def parse_number(value: Any) -> float | None:
+def number_text(text: str) -> str:
+    """Remove spreadsheet number formatting from a text value.
+
+    "$1,234.50" becomes "1234.50", "12%" becomes "12" and "-$5" becomes "-5".
+    Commas are only removed when they separate thousands (1,234,567), so
+    "1,5" stays as it is: it may mean 1.5 in some countries.
+    """
+    t = text.strip()
+    if t.endswith("%"):
+        t = t[:-1].rstrip()
+    sign = ""
+    if t[:1] in ("-", "+") and len(t) > 1:
+        sign, t = t[0], t[1:].lstrip()
+    if t and t[0] in CURRENCY_SIGNS:
+        t = t[1:].lstrip()
+    elif t and t[-1] in CURRENCY_SIGNS:
+        t = t[:-1].rstrip()
+    if not sign and t[:1] in ("-", "+") and len(t) > 1:  # "$-5"
+        sign, t = t[0], t[1:]
+    if GROUPED_NUMBER.match(t):
+        t = t.replace(",", "")
+    return sign + t
+
+
+def parse_number(value: Any, *, true_false: bool = False) -> float | None:
     """Read one value as a number. Returns None for a missing value.
+
+    Spreadsheet formatting is allowed: "$1,234.50" is read as 1234.5. With
+    ``true_false`` (a numeric column trained from true/false values), true and
+    false are read as 1 and 0.
 
     Raises ValueError with a short message when the value is not a number.
     """
     if is_missing(value):
         return None
     if isinstance(value, (bool, np.bool_)):
+        if true_false:
+            return float(value)
         raise ValueError("expected a number, got true/false")
     if isinstance(value, (int, float, np.integer, np.floating)):
         try:
@@ -80,8 +122,10 @@ def parse_number(value: Any) -> float | None:
         except OverflowError:  # a whole number too large for a float, such as 10**400
             raise ValueError("expected a finite number") from None
     elif isinstance(value, str):
+        if true_false and value.strip().lower() in ("true", "false"):
+            return 1.0 if value.strip().lower() == "true" else 0.0
         try:
-            number = float(value.strip())
+            number = float(number_text(value))
         except ValueError:
             raise ValueError(f"expected a number, got {value!r}") from None
     else:
@@ -146,10 +190,26 @@ def numeric_series(series: pd.Series) -> pd.Series:
     if pd.api.types.is_bool_dtype(series) or pd.api.types.is_numeric_dtype(series):
         numbers = series.astype(float)
     else:
-        text = series.map(lambda v: None if is_missing(v) else str(v).strip())
+        text = series.map(_number_cell)
         numbers = pd.to_numeric(text, errors="coerce").astype(float)
     # "inf" and "-inf" are not usable numbers: treat them as empty.
     return numbers.mask(np.isinf(numbers))
+
+
+def _number_cell(value: Any) -> Any:
+    """One cell of a text column, ready for pd.to_numeric."""
+    if is_missing(value):
+        return None
+    if isinstance(value, (bool, np.bool_)):
+        return float(value)
+    return number_text(str(value))
+
+
+def _is_true_false(values: pd.Series) -> bool:
+    """True when every (non-missing) value is true or false."""
+    if pd.api.types.is_bool_dtype(values):
+        return True
+    return bool(values.map(lambda v: isinstance(v, (bool, np.bool_))).all())
 
 
 def category_series(series: pd.Series) -> pd.Series:
@@ -179,13 +239,15 @@ def _guess_kind(name: str, values: pd.Series) -> tuple[str | None, str]:
         return "numeric", ""
 
     text = values.astype(str).str.strip()
-    numbers = pd.to_numeric(text, errors="coerce")
+    numbers = pd.to_numeric(text.map(number_text), errors="coerce")
     if numbers.notna().mean() >= NUMERIC_SHARE:
         if ID_NAME.search(name) and numbers.dropna().is_unique:
             return None, "looks like an ID column (a different value in every row)"
         return "numeric", ""
     if text.str.match(DATE_TEXT).mean() >= NUMERIC_SHARE:
         return None, "looks like dates; dates are not supported yet (add columns such as year or month instead)"
+    if text.str.match(DECIMAL_COMMA).mean() >= NUMERIC_SHARE:
+        return None, DECIMAL_COMMA_HINT
 
     unique = text.nunique()
     if unique > MAX_CATEGORIES:
@@ -270,6 +332,8 @@ def infer_features(
                 dropped.append({"name": name, "reason": "has the same value in every row"})
                 continue
             unreadable = int(len(values) - len(ok))
+            if _is_true_false(values):
+                spec["true_false"] = True
             integer = bool((ok == ok.round()).all())
             median = float(ok.median())
             # A clean typical value: whole numbers stay whole, no float noise.
@@ -284,7 +348,13 @@ def infer_features(
                 }
             )
             if unreadable:
-                spec["note"] = f"{unreadable} values were not numbers and are treated as empty"
+                # Remember placeholders such as "-" or "?", so predictions treat them as empty too.
+                bad = values[col.loc[values.index].isna()]
+                tokens = sorted({str(v).strip() for v in bad})
+                shown = ", ".join(repr(t) for t in tokens[:5]) + (", ..." if len(tokens) > 5 else "")
+                spec["note"] = f"{unreadable} values were not numbers and are treated as empty: {shown}"
+                if len(tokens) <= MAX_MISSING_TOKENS:
+                    spec["missing_tokens"] = tokens
         else:
             col = category_series(series).dropna()
             counts = col.value_counts()
@@ -369,9 +439,16 @@ def check_records(
         for f in features:
             name = f["name"]
             value = record[name]
+            if f["type"] == "numeric" and isinstance(value, str) and value.strip() in f.get("missing_tokens", ()):
+                row[name] = np.nan
+                row_notes.append(
+                    f"{name} is {value.strip()!r}, which training treated as empty; "
+                    "the model fills the gap as best it can"
+                )
+                continue
             try:
                 if f["type"] == "numeric":
-                    parsed = parse_number(value)
+                    parsed = parse_number(value, true_false=f.get("true_false", False))
                     if parsed is not None and parsed < f["min"]:
                         row_notes.append(
                             f"{name} is below the lowest value seen in training ({f['min']}); "

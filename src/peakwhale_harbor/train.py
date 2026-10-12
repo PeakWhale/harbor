@@ -37,6 +37,8 @@ from sklearn.preprocessing import OrdinalEncoder
 from . import __version__
 from .bundle import BUNDLE_FORMAT, FORMAT_VERSION, Bundle, file_sha256, load_bundle, predict_with_range, save_bundle
 from .schema import (
+    DECIMAL_COMMA,
+    DECIMAL_COMMA_HINT,
     NUMERIC_SHARE,
     infer_features,
     input_json_schema,
@@ -205,6 +207,9 @@ def train(
     y_all = numeric_series(df[target])
     present = df[target].notna().sum()
     if present == 0 or y_all.notna().sum() < NUMERIC_SHARE * present:
+        text = df[target].dropna().astype(str).str.strip()
+        if len(text) and text.str.match(DECIMAL_COMMA).mean() >= NUMERIC_SHARE:
+            raise TrainingError(f"the target column {target!r} {DECIMAL_COMMA_HINT}.")
         raise TrainingError(
             f"the target column {target!r} must contain numbers. Harbor predicts numbers (regression). "
             "Yes/no or category targets are not supported yet."
@@ -227,7 +232,8 @@ def train(
         skipped = "; ".join(f"{d['name']} ({d['reason']})" for d in dropped_columns) or "none"
         raise TrainingError(f"no usable input columns are left. Skipped columns: {skipped}")
     for f in features:
-        say(f"  input  {f['name']:<28} {f['type']}")
+        note = f"  ({f['note']})" if f.get("note") else ""
+        say(f"  input  {f['name']:<28} {f['type']}{note}")
     for d in dropped_columns:
         say(f"  skip   {d['name']:<28} {d['reason']}")
 

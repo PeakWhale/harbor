@@ -145,6 +145,31 @@ def test_unknown_target_suggests_a_column(tmp_path):
         train(EXAMPLE_CSV, "repair_hour", tmp_path / "x")
 
 
+def test_formatted_target_is_read(tmp_path):
+    df = mixed_frame(300)
+    df["target"] = [f"${v:,.2f}" for v in df["target"] * 1000]
+    lines = []
+    b = train(df, "target", tmp_path / "money", log=lines.append)
+    assert b.metadata["rows"]["used"] == 300
+    assert b.target["max"] > 1000
+
+
+def test_decimal_comma_target_gets_a_hint(tmp_path):
+    df = mixed_frame(300)
+    df["target"] = [f"{v:.2f}".replace(".", ",") for v in df["target"]]
+    with pytest.raises(TrainingError, match="decimal comma"):
+        train(df, "target", tmp_path / "x")
+
+
+def test_training_log_shows_column_notes(tmp_path):
+    df = mixed_frame(300)
+    df["size"] = df["size"].astype(object)
+    df.loc[0, "size"] = "?"
+    lines = []
+    train(df, "target", tmp_path / "notes", log=lines.append)
+    assert any("input  size" in line and "1 values were not numbers" in line for line in lines)
+
+
 def test_text_target_is_refused(tmp_path):
     with pytest.raises(TrainingError, match="must contain numbers"):
         train(EXAMPLE_CSV, "machine_type", tmp_path / "x")

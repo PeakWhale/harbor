@@ -69,6 +69,74 @@ def test_user_overrides():
     assert reasons(dropped)["size"] == "you asked to drop it"
 
 
+def test_user_overrides_work_for_predictions(tmp_path):
+    from peakwhale_harbor import train
+
+    df = mixed_frame(200)
+    b = train(df, "target", tmp_path / "overrides", categorical=["rooms"], drop=["size"], numeric=["flag"])
+    f = by_name(b.features)
+    assert f["flag"]["true_false"] is True
+    record = {"rooms": 2, "color": "red", "flag": True, "price_text": 3}
+    results = b.predict([record, {**record, "flag": "false"}, {**record, "flag": "TRUE"}, {**record, "flag": 0}])
+    for r in results:
+        assert r["low"] <= r["prediction"] <= r["high"]
+    # The CSV path reads every cell as text ("True"), like the batch upload does.
+    table = b.predict_table(pd.DataFrame([{**record, "flag": "True", "rooms": "2"}]).astype(str))
+    assert len(table) == 1
+    frame, _ = check_records([record, {**record, "flag": "false"}, {**record, "flag": 0}], b.features)
+    assert frame["flag"].tolist() == [1.0, 0.0, 0.0]
+
+
+def test_true_false_is_not_a_number_for_other_columns():
+    features, _ = infer_features(mixed_frame(), "target")
+    good = {"size": True, "rooms": 2, "color": "red", "flag": True, "price_text": 3}
+    with pytest.raises(InputError, match="problem"):
+        check_records([good], features)
+
+
+def test_spreadsheet_number_formats_are_numbers():
+    df = mixed_frame()
+    rng = np.random.default_rng(1)
+    money = rng.uniform(1000, 900000, len(df))
+    df["price"] = [f"${v:,.2f}" for v in money]
+    df["count"] = [f"{int(v):,}" for v in money]
+    df["share"] = [f"{v:.1f}%" for v in rng.uniform(0, 100, len(df))]
+    f = by_name(infer_features(df, "target")[0])
+    for name in ("price", "count", "share"):
+        assert f[name]["type"] == "numeric", name
+        assert "note" not in f[name], name
+    assert f["price"]["max"] == pytest.approx(round(money.max(), 2))
+    frame, notes = check_records([{**{n: 1 for n in f}, "color": "red", "price": "$309,715.32", "count": "2,092",
+                                   "share": "12.5%", "flag": True}], list(f.values()))
+    assert frame.loc[0, ["price", "count", "share"]].tolist() == [309715.32, 2092.0, 12.5]
+
+
+def test_placeholders_are_empty_in_training_and_predictions():
+    df = mixed_frame()
+    df["size"] = df["size"].astype(object)
+    df.loc[0, "size"] = "-"
+    df.loc[1, "size"] = "#DIV/0!"
+    df.loc[2, "size"] = "?"
+    features, _ = infer_features(df, "target")
+    size = by_name(features)["size"]
+    assert size["type"] == "numeric"
+    assert size["missing_tokens"] == ["#DIV/0!", "-", "?"]
+    assert size["note"].startswith("3 values were not numbers")
+    good = {"size": 50, "rooms": 2, "color": "red", "flag": True, "price_text": 3}
+    frame, notes = check_records([{**good, "size": " - "}, {**good, "size": "#DIV/0!"}], features)
+    assert frame["size"].isna().all()
+    assert "treated as empty" in notes[0][0]
+    with pytest.raises(InputError):
+        check_records([{**good, "size": "n.a."}], features)
+
+
+def test_decimal_commas_get_a_clear_reason():
+    df = mixed_frame()
+    df["weight"] = [f"{v:.2f}".replace(".", ",") for v in df["size"]]
+    _, dropped = infer_features(df, "target")
+    assert "decimal comma" in reasons(dropped)["weight"]
+
+
 def test_unknown_override_column_suggests_a_name():
     with pytest.raises(ValueError, match="Did you mean 'rooms'"):
         infer_features(mixed_frame(), "target", categorical=["room"])
@@ -90,13 +158,31 @@ def test_missing_values_are_counted():
 
 @pytest.mark.parametrize(
     "value, expected",
-    [(3, 3.0), (2.5, 2.5), ("4.25", 4.25), (" 7 ", 7.0), (None, None), ("", None), (float("nan"), None)],
+    [
+        (3, 3.0),
+        (2.5, 2.5),
+        ("4.25", 4.25),
+        (" 7 ", 7.0),
+        (None, None),
+        ("", None),
+        (float("nan"), None),
+        ("$309,715.32", 309715.32),
+        ("2,092", 2092.0),
+        ("1,234,567", 1234567.0),
+        ("12%", 12.0),
+        ("-$5", -5.0),
+        ("$-5", -5.0),
+        ("€ 1,000", 1000.0),
+        ("1,000 €", 1000.0),
+    ],
 )
 def test_parse_number(value, expected):
     assert parse_number(value) == expected
 
 
-@pytest.mark.parametrize("value", ["abc", True, [1], {"a": 1}, float("inf"), "1,5", 10**400, "1e400"])
+@pytest.mark.parametrize(
+    "value", ["abc", True, [1], {"a": 1}, float("inf"), "1,5", 10**400, "1e400", "12,34", "$", "-", "%"]
+)
 def test_parse_number_rejects_bad_values(value):
     with pytest.raises(ValueError):
         parse_number(value)
