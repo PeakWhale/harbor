@@ -120,12 +120,14 @@ def conformal_offset(low: np.ndarray, high: np.ndarray, y: np.ndarray, coverage:
     the true value for about ``coverage`` of new rows, if new rows look like
     the training data.
     """
-    scores = np.maximum(low - y, y - high)
+    scores = np.sort(np.maximum(low - y, y - high))
     n = len(scores)
-    level = np.ceil((n + 1) * coverage) / n
-    if level >= 1:
-        return float(scores.max())
-    return float(np.quantile(scores, level, method="higher"))
+    # The k-th smallest score, with k = ceil((n + 1) * coverage). The small
+    # tolerance keeps float noise such as 9.000000000000002 from adding one.
+    k = int(np.ceil((n + 1) * coverage - 1e-9))
+    if k > n:
+        return float(scores[-1])
+    return float(scores[k - 1])
 
 
 def regression_metrics(y: np.ndarray, out: Mapping[str, np.ndarray], train_median: float) -> dict[str, float]:

@@ -242,6 +242,19 @@ def test_conformal_offset():
     assert conformal_offset(low, high, y, 0.95) == pytest.approx(3.0)
 
 
+def test_conformal_offset_takes_the_right_order_statistic():
+    # Scores 1..10. k = ceil(11 * 0.8) = 9, so the offset is the 9th smallest score.
+    y = np.zeros(10)
+    scores = np.arange(1, 11, dtype=float)
+    low, high = -np.ones(10), -scores  # y - high = score, low - y = -1
+    assert conformal_offset(low, high, y, 0.8) == pytest.approx(9.0)
+    # k = ceil(11 * 0.95) = 11 is more than 10 scores: use the largest score.
+    assert conformal_offset(low, high, y, 0.95) == pytest.approx(10.0)
+    # 99 scores at 0.55: k = 55, although 100 * 0.55 is 55.00000000000001 in floats.
+    y, scores = np.zeros(99), np.arange(1, 100, dtype=float)
+    assert conformal_offset(-np.ones(99), -scores, y, 0.55) == pytest.approx(55.0)
+
+
 def test_predictions_use_one_openmp_thread():
     """Many OpenMP threads make single predictions very slow on a busy computer."""
     from threadpoolctl import threadpool_info
