@@ -14,7 +14,7 @@ WORKDIR /app
 COPY requirements.txt /app/
 RUN pip install -r requirements.txt
 
-COPY pyproject.toml README.md LICENSE /app/
+COPY pyproject.toml README.md LICENSE NOTICE /app/
 COPY src /app/src
 RUN pip install --no-deps .
 
