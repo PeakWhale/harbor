@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import warnings
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -30,6 +30,7 @@ import sklearn
 import skops.io as sio
 from threadpoolctl import ThreadpoolController
 
+from .csvfile import read_csv
 from .schema import InputError, check_records, example_record
 
 BUNDLE_FORMAT = "harbor-bundle"
@@ -226,11 +227,21 @@ def _free_name(name: str, taken: Sequence[Any]) -> str:
     return f"{name}_{number}"
 
 
-def read_csv_for_prediction(source: Any) -> pd.DataFrame:
-    """Read a CSV for prediction. Every cell stays text until it is checked."""
-    df = pd.read_csv(source, dtype=str, keep_default_na=True)
-    df.columns = [str(c).strip() for c in df.columns]
-    return df
+def read_csv_for_prediction(
+    source: Any,
+    *,
+    name: str = "",
+    max_columns: int | None = None,
+    log: Callable[[str], None] | None = None,
+) -> pd.DataFrame:
+    """Read a CSV file (a path, bytes or an open binary file) for prediction.
+
+    Every cell stays text until it is checked. ``name`` is the file name, used
+    to find the separator (a tab for .tsv). See :mod:`peakwhale_harbor.csvfile`.
+    """
+    if hasattr(source, "read"):
+        source = source.read()
+    return read_csv(source, name=name, text_only=True, max_columns=max_columns, log=log)
 
 
 _threadpools: ThreadpoolController | None = None

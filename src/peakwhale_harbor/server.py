@@ -23,6 +23,8 @@ from .schema import InputError, example_value
 APP_NAME = "PeakWhale Harbor"
 MAX_JSON_RECORDS = 1000
 MAX_BATCH_ROWS = 100_000
+#: Uploads with more columns are refused before they are read (plus room for the model's own inputs).
+MAX_BATCH_COLUMNS = 1000
 
 
 def _csv_response(df: pd.DataFrame, filename: str) -> Response:
@@ -58,6 +60,7 @@ def create_app(bundle: Bundle | str | Path | None = None) -> Flask:
     target = bundle.target
     target_info = {"name": target["name"], "description": target.get("description", "")}
     typical = {f["name"]: example_value(f) for f in bundle.features}
+    max_columns = max(MAX_BATCH_COLUMNS, len(bundle.features) + 100)
 
     def range_bar(result: dict[str, Any]) -> dict[str, float]:
         """Positions (0 to 100) for the small range picture in the UI."""
@@ -153,7 +156,7 @@ def create_app(bundle: Bundle | str | Path | None = None) -> Flask:
         if upload is None or not upload.filename:
             return fail("Upload a CSV file in the form field 'file'.")
         try:
-            df = read_csv_for_prediction(upload.stream)
+            df = read_csv_for_prediction(upload.stream, name=upload.filename, max_columns=max_columns)
         except Exception as exc:  # pandas raises many error types
             return fail(f"Could not read the file as CSV: {exc}")
         if df.empty:

@@ -1,6 +1,7 @@
 import json
 
 import pandas as pd
+import pytest
 
 from conftest import EXAMPLE_CSV, TARGET
 from peakwhale_harbor.cli import main
@@ -31,6 +32,15 @@ def test_predict_command(bundle_dir, tmp_path):
     out = pd.read_csv(dst)
     assert len(out) == 10
     assert (out[f"{TARGET}_low"] <= out[f"{TARGET}_prediction"]).all()
+
+
+@pytest.mark.parametrize("name, sep, encoding", [("in.tsv", "\t", "utf-8"), ("in.csv", ";", "cp1252")])
+def test_predict_command_reads_tsv_and_excel_files(bundle_dir, tmp_path, capsys, name, sep, encoding):
+    src = tmp_path / name
+    src.write_bytes(pd.read_csv(EXAMPLE_CSV).head(10).to_csv(index=False, sep=sep).encode(encoding))
+    dst = tmp_path / "out.csv"
+    assert main(["predict", str(bundle_dir), str(src), "--out", str(dst)]) == 0
+    assert len(pd.read_csv(dst)) == 10
 
 
 def test_predict_command_bad_input(bundle_dir, tmp_path, capsys):

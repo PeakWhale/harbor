@@ -186,6 +186,32 @@ def test_no_usable_columns(tmp_path):
         train(df, "y", tmp_path / "x")
 
 
+def test_reads_windows_excel_csv_files(tmp_path):
+    """Excel on Windows: Windows-1252 text, and a semicolon in many European languages."""
+    df = mixed_frame(300)
+    df["color"] = df["color"].map({"red": "rouge", "green": "vert", "blue": "bleu clair é"})
+    for sep in (",", ";"):
+        src = tmp_path / f"données{sep == ';'}.csv"
+        src.write_bytes(df.to_csv(index=False, sep=sep).encode("cp1252"))
+        lines = []
+        b = train(src, "target", tmp_path / f"win{sep == ';'}", log=lines.append)
+        assert "bleu clair é" in {x["name"]: x for x in b.features}["color"]["categories"]
+        assert any("Windows-1252" in line for line in lines)
+        assert any("';' between columns" in line for line in lines) == (sep == ";")
+
+
+def test_reads_utf8_with_bom_and_tsv(tmp_path):
+    df = mixed_frame(300)
+    src = tmp_path / "bom.csv"
+    src.write_bytes(df.to_csv(index=False).encode("utf-8-sig"))
+    lines = []
+    b = train(src, "target", tmp_path / "bom", log=lines.append)
+    assert "size" in b.feature_names and not any("UTF-8" in line for line in lines)
+    tsv = tmp_path / "data.tsv"
+    df.to_csv(tsv, index=False, sep="\t")
+    assert "size" in train(tsv, "target", tmp_path / "tsv").feature_names
+
+
 def test_spreadsheet_files_need_csv(tmp_path):
     xlsx = tmp_path / "data.xlsx"
     xlsx.write_bytes(b"not really excel")

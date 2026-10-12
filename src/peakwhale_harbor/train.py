@@ -36,6 +36,7 @@ from sklearn.preprocessing import OrdinalEncoder
 
 from . import __version__
 from .bundle import BUNDLE_FORMAT, FORMAT_VERSION, Bundle, file_sha256, load_bundle, predict_with_range, save_bundle
+from .csvfile import read_csv
 from .schema import (
     DECIMAL_COMMA,
     DECIMAL_COMMA_HINT,
@@ -56,20 +57,20 @@ class TrainingError(Exception):
     """Training cannot start or finish. The message says what to fix."""
 
 
-def read_table(path: str | Path) -> pd.DataFrame:
+def read_table(path: str | Path, log: Callable[[str], None] | None = None) -> pd.DataFrame:
     """Read a CSV (or .csv.gz / .tsv) file into a table."""
     path = Path(path)
     if not path.is_file():
         raise TrainingError(f"file not found: {path}")
     name = path.name.lower()
     if name.endswith((".xlsx", ".xls", ".ods", ".numbers")):
-        raise TrainingError("Harbor reads CSV files. Save the sheet as CSV first (File > Save As > CSV).")
-    sep = "\t" if name.endswith((".tsv", ".tsv.gz")) else ","
+        raise TrainingError(
+            'Harbor reads CSV files. Save the sheet as CSV first (File > Save As > "CSV UTF-8 (Comma delimited)").'
+        )
     try:
-        df = pd.read_csv(path, sep=sep)
+        df = read_csv(path, log=log)
     except Exception as exc:  # pandas raises many error types
         raise TrainingError(f"could not read {path.name} as CSV: {exc}") from None
-    df.columns = [str(c).strip() for c in df.columns]
     duplicated = sorted({c for c in df.columns if list(df.columns).count(c) > 1})
     if duplicated:
         raise TrainingError(f"column names must be unique, these repeat: {duplicated}")
@@ -180,7 +181,7 @@ def train(
         df.columns = [str(c) for c in df.columns]
     else:
         path = Path(data)
-        df = read_table(path)
+        df = read_table(path, log=say)
         source = {"file": path.name, "sha256": file_sha256(path)}
         if title is None:
             title = _title_from(path.name.split(".")[0])

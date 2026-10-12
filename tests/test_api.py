@@ -174,6 +174,23 @@ def test_batch_keeps_columns_with_the_same_names(client):
     assert (out[f"{TARGET}_low"] <= out[f"{TARGET}_prediction_2"]).all()
 
 
+def test_batch_reads_tsv_and_semicolon_files(client):
+    df = pd.read_csv(EXAMPLE_CSV).head(5)
+    for name, sep in (("machines.tsv", "\t"), ("machines.csv", ";")):
+        data = {"file": (io.BytesIO(df.to_csv(index=False, sep=sep).encode("cp1252")), name)}
+        r = client.post("/predict_batch", data=data, content_type="multipart/form-data")
+        assert r.status_code == 200, r.get_json()
+        assert len(pd.read_csv(io.BytesIO(r.data))) == 5
+
+
+def test_batch_refuses_very_wide_files(client):
+    header = ",".join(f"c{i}" for i in range(5000))
+    data = {"file": (io.BytesIO((header + "\n" + "," * 4999 + "\n").encode()), "wide.csv")}
+    r = client.post("/predict_batch", data=data, content_type="multipart/form-data")
+    assert r.status_code == 400
+    assert "more than 1000 columns" in r.get_json()["error"]
+
+
 def test_batch_reports_csv_line_numbers(client):
     df = pd.read_csv(EXAMPLE_CSV).head(5)
     df["age_years"] = df["age_years"].astype(object)

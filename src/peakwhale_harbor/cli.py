@@ -119,7 +119,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 def cmd_predict(args: argparse.Namespace) -> int:
     try:
         bundle = load_bundle(args.bundle)
-        df = read_csv_for_prediction(args.csv)
+        df = read_csv_for_prediction(args.csv, log=lambda message: print(message, file=sys.stderr))
         out = bundle.predict_table(df)
     except BundleError as exc:
         return _error(str(exc))
