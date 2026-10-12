@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "peakwhale-harbor"
+version = "2.0.0"
+description = "Turn a spreadsheet (CSV) into a prediction API with honest metrics and prediction ranges."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Aditya Rao (Addy) Kaveti" }]
+requires-python = ">=3.10"
+keywords = ["machine-learning", "tabular", "regression", "prediction-intervals", "flask", "api"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Framework :: Flask",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "flask>=3.0",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "scikit-learn>=1.5,<2",
+    "skops>=0.10",
+]
+
+[project.optional-dependencies]
+server = ["gunicorn>=22"]
+mcp = ["mcp>=2,<3"]
+dev = ["pytest>=8", "mcp>=2,<3"]
+
+[project.urls]
+Source = "https://github.com/PeakWhale/harbor"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+peakwhale_harbor = ["templates/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    # Harbor must always pass named columns to the model (old bug).
+    "error:X does not have valid feature names:UserWarning",
+]
