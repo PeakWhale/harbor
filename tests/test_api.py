@@ -94,6 +94,12 @@ def test_not_a_number(client, good_record):
     assert "expected a number" in problem["error"]
 
 
+def test_huge_number_is_a_bad_request(client, good_record):
+    r = client.post("/predict_api", json={"data": {**good_record, "age_years": 10**400}})
+    assert r.status_code == 400
+    assert r.get_json()["problems"][0] == {"row": 0, "field": "age_years", "error": "expected a finite number"}
+
+
 def test_unknown_category(client, good_record):
     r = client.post("/predict_api", json={"data": {**good_record, "machine_type": "boat"}})
     assert r.status_code == 400

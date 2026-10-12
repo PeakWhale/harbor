@@ -75,7 +75,10 @@ def parse_number(value: Any) -> float | None:
     if isinstance(value, (bool, np.bool_)):
         raise ValueError("expected a number, got true/false")
     if isinstance(value, (int, float, np.integer, np.floating)):
-        number = float(value)
+        try:
+            number = float(value)
+        except OverflowError:  # a whole number too large for a float, such as 10**400
+            raise ValueError("expected a finite number") from None
     elif isinstance(value, str):
         try:
             number = float(value.strip())

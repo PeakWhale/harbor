@@ -96,7 +96,7 @@ def test_parse_number(value, expected):
     assert parse_number(value) == expected
 
 
-@pytest.mark.parametrize("value", ["abc", True, [1], {"a": 1}, float("inf"), "1,5"])
+@pytest.mark.parametrize("value", ["abc", True, [1], {"a": 1}, float("inf"), "1,5", 10**400, "1e400"])
 def test_parse_number_rejects_bad_values(value):
     with pytest.raises(ValueError):
         parse_number(value)
