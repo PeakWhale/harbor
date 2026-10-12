@@ -144,3 +144,6 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# Trained model bundles (train them with: harbor train ...)
+models/

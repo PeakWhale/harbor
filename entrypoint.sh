@@ -3,8 +3,9 @@ set -eu
 
 PORT="${PORT:-8000}"
 
+# HARBOR_BUNDLE picks the bundle folder (default: the California housing demo).
 exec gunicorn \
-  --workers 4 \
+  --workers "${WORKERS:-2}" \
+  --threads 4 \
   --bind "0.0.0.0:${PORT}" \
-  app:app
-
+  "peakwhale_harbor.server:create_app()"

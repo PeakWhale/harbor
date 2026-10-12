@@ -1,28 +1,33 @@
 FROM python:3.11-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PORT=8000 \
+    HARBOR_BUNDLE=/app/models/california-housing
+
 WORKDIR /app
 
+# Pinned dependencies first, so this layer is cached between builds.
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-COPY . /app
+COPY pyproject.toml README.md LICENSE /app/
+COPY src /app/src
+RUN pip install --no-deps .
+
+# Train the demo bundle at build time. Same data, seed and versions give the same model.
+COPY data /app/data
+RUN harbor train data/california_housing.csv \
+      --target median_house_value \
+      --descriptions data/california_housing.columns.json \
+      --out models/california-housing
+
+COPY entrypoint.sh /app/
+RUN useradd --create-home --uid 10001 harbor
+USER harbor
 
 EXPOSE 8000
 
 ENTRYPOINT ["./entrypoint.sh"]
-FROM python:3.11-slim
-
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PORT=8000
-
-WORKDIR /app
-
-COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . /app
-
-EXPOSE 8000
-
-CMD gunicorn --workers=2 --threads=4 --bind 0.0.0.0:$PORT app:app
