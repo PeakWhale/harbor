@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{{ app_name }}: {{ bundle.title }}</title>
+    <style>
+      :root{
+        --bg0:#0b0d10;
+        --bg1:#0f1217;
+        --text:#e9eef5;
+        --muted:#b3bdc9;
+        --muted2:#93a0af;
+        --border:rgba(255,255,255,0.10);
+        --border2:rgba(255,255,255,0.14);
+        --accent:#6ea8fe;
+        --good:#4ade80;
+        --warn:#fbbf24;
+        --bad:#f87171;
+      }
+
+      *{ box-sizing:border-box; }
+      html{ height:100%; background: var(--bg1); }
+      body{
+        margin:0;
+        min-height:100%;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        color:var(--text);
+        background:
+          radial-gradient(1000px 500px at 20% 0%, rgba(110,168,254,0.18), transparent 60%),
+          radial-gradient(900px 450px at 100% 20%, rgba(74,222,128,0.10), transparent 60%),
+          linear-gradient(180deg, var(--bg0), var(--bg1));
+      }
+
+      .wrap{ max-width: 1120px; margin: 0 auto; padding: 28px 18px 40px; }
+      .header{ display:flex; flex-direction:column; gap:10px; margin-bottom: 16px; }
+      h1{ font-size: 56px; line-height: 1.02; margin: 0; letter-spacing: -0.02em; }
+      @media (max-width: 600px){ h1{ font-size: 40px; } }
+      .subtitle{ font-size: 22px; color: var(--muted); margin: 0; }
+      .desc{ font-size: 15px; color: var(--muted2); max-width: 860px; margin: 0; line-height: 1.45; }
+
+      .metaRow{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top: 4px; }
+      .pill{
+        display:inline-flex; gap:8px; align-items:center;
+        padding: 6px 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.20);
+        border-radius: 999px; font-size: 13px; color: var(--muted);
+      }
+      .pill a, .panelBody a{ color: var(--text); text-decoration: none; border-bottom: 1px dashed rgba(255,255,255,0.25); }
+
+      .layout{ display:grid; grid-template-columns: 1fr; gap: 16px; margin-top: 18px; }
+      @media (min-width: 980px){ .layout{ grid-template-columns: 2.2fr 1fr; align-items:start; } }
+      .side{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+
+      .panel{ border: 1px solid var(--border); background: rgba(0,0,0,0.18); border-radius: 18px; overflow:hidden; min-width:0; }
+      .panelHeader{
+        padding: 14px 16px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.03);
+        display:flex; align-items:center; justify-content:space-between; gap:10px;
+      }
+      .panelTitle{ margin:0; font-size: 14px; letter-spacing: 0.02em; color: var(--muted); text-transform: uppercase; }
+      .panelBody{ padding: 16px; }
+
+      .resultBox{
+        border: 1px solid var(--border2); background: rgba(18,22,28,0.65);
+        border-radius: 14px; padding: 12px; margin-bottom: 12px;
+      }
+      .resultLabel{ font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+      .resultValue{ font-size: 18px; line-height: 1.25; margin: 0; }
+      .bigValue{ font-size: 34px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+      .rangeText{ color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+
+      .bar{ position:relative; height: 10px; border-radius: 999px; background: rgba(255,255,255,0.08); margin: 14px 0 6px; }
+      .barRange{ position:absolute; top:0; bottom:0; border-radius: 999px; background: rgba(110,168,254,0.45); }
+      .barPoint{ position:absolute; top:-4px; width: 4px; height: 18px; margin-left:-2px; border-radius: 2px; background: var(--text); }
+      .barScale{ display:flex; justify-content:space-between; font-size: 11px; color: var(--muted2); }
+
+      .grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+      .fieldCard{
+        border: 1px solid var(--border); background: rgba(18,22,28,0.55); border-radius: 16px;
+        padding: 12px; display:flex; flex-direction:column; justify-content:space-between; gap:10px; min-width: 0;
+      }
+      .fieldTop{ display:flex; flex-direction:column; gap:4px; }
+      .fieldName{ font-weight: 700; letter-spacing: 0.02em; margin: 0; overflow-wrap:anywhere; }
+      .fieldDesc{ font-size: 13px; color: var(--muted); margin: 0; line-height: 1.3; }
+      .fieldHint{ font-size: 12px; color: var(--muted2); margin: 0; }
+
+      input[type="number"], select, input[type="file"]{
+        width: 100%; padding: 12px; border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.12);
+        color: var(--text); outline: none; font-size: 15px;
+      }
+      select option{ color: #0b0d10; }
+      input[type="number"]::placeholder{ color: rgba(233,238,245,0.55); }
+      input:focus, select:focus{ border-color: rgba(110,168,254,0.55); box-shadow: 0 0 0 3px rgba(110,168,254,0.14); }
+
+      .actions{ display:flex; flex-wrap:wrap; gap:10px; margin-top: 14px; align-items:center; }
+      .btn{
+        appearance:none; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.35);
+        color: var(--text); padding: 10px 14px; border-radius: 14px; cursor:pointer; font-size: 15px; font-weight: 650;
+      }
+      .btnPrimary{ border-color: rgba(110,168,254,0.45); background: rgba(110,168,254,0.16); }
+      .btn:hover{ border-color: rgba(255,255,255,0.28); }
+      .btnPrimary:hover{ border-color: rgba(110,168,254,0.75); }
+      .footerNote{ font-size: 13px; color: var(--muted2); margin-left: 6px; }
+
+      code{
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 12.5px; color: var(--text); background: rgba(0,0,0,0.28);
+        border: 1px solid var(--border); padding: 2px 6px; border-radius: 10px; overflow-wrap:anywhere;
+      }
+
+      .smallList{ margin: 10px 0 0; padding: 0; list-style: none; display:flex; flex-direction:column; gap:8px; }
+      .smallList li{ color: var(--muted); font-size: 13px; line-height: 1.35; }
+      .smallTitle{ margin: 0 0 8px; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+      .hint{ font-size: 12px; color: var(--muted2); margin-top: 10px; line-height: 1.4; }
+
+      .stats{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .stat{ border: 1px solid var(--border); border-radius: 12px; padding: 10px; background: rgba(18,22,28,0.45); }
+      .statValue{ font-size: 18px; font-weight: 700; margin: 0; }
+      .statLabel{ font-size: 12px; color: var(--muted); margin: 2px 0 0; line-height: 1.3; }
+
+      .notes li{ color: var(--warn); }
+      .error{ color: var(--bad); margin: 0 0 8px; }
+      .errors li{ color: var(--bad); }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <div class="header">
+        <h1>{{ app_name }}</h1>
+        <p class="subtitle">{{ bundle.title }}</p>
+        <p class="desc">
+          {% if bundle.schema.description %}{{ bundle.schema.description }}{% else %}
+          This model predicts <code>{{ target.name }}</code> from {{ features|length }} input fields.
+          {% endif %}
+          {% if target.description %}{{ target.description }}{% endif %}
+          Every prediction comes with a range that should hold the true value about {{ (coverage * 100)|round|int }}% of the time.
+        </p>
+
+        <div class="metaRow">
+          <span class="pill">Target: <code>{{ target.name }}</code></span>
+          <span class="pill">Schema: <a href="/schema" target="_blank" rel="noreferrer">/schema</a></span>
+          <span class="pill">API: <code>POST /predict_api</code></span>
+          <span class="pill">Batch: <code>POST /predict_batch</code></span>
+        </div>
+      </div>
+
+      <div class="layout">
+        <div class="panel">
+          <div class="panelHeader">
+            <p class="panelTitle">Inputs</p>
+          </div>
+
+          <div class="panelBody">
+            <form id="harborForm" action="/predict" method="post" autocomplete="off">
+              <div class="grid">
+                {% for f in features %}
+                  <div class="fieldCard">
+                    <div class="fieldTop">
+                      <p class="fieldName">{{ f.name }}</p>
+                      {% if f.description %}<p class="fieldDesc">{{ f.description }}</p>{% endif %}
+                      {% if f.type == "numeric" %}
+                        <p class="fieldHint">Number. Seen in training: {{ f.min|num }} to {{ f.max|num }}.</p>
+                      {% else %}
+                        <p class="fieldHint">Choose one of {{ f.categories|length }} values.</p>
+                      {% endif %}
+                    </div>
+
+                    {% if f.type == "numeric" %}
+                      <input
+                        type="number"
+                        name="{{ f.name }}"
+                        id="field-{{ loop.index }}"
+                        value="{{ values.get(f.name) if values.get(f.name) is not none else '' }}"
+                        placeholder="{{ f.median }}"
+                        step="any"
+                        inputmode="decimal"
+                        aria-label="{{ f.name }}"
+                      />
+                    {% else %}
+                      <select name="{{ f.name }}" id="field-{{ loop.index }}" aria-label="{{ f.name }}">
+                        <option value="" {% if not values.get(f.name) %}selected{% endif %}>(unknown)</option>
+                        {% for c in f.categories %}
+                          <option value="{{ c }}" {% if values.get(f.name) == c %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                      </select>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+
+              <div class="actions">
+                <button class="btn btnPrimary" type="submit">Predict</button>
+                <button class="btn" type="button" onclick="fillTypical()">Typical values</button>
+                <button class="btn" type="button" onclick="clearForm()">Clear</button>
+                <span class="footerNote">Demo only. Not financial or appraisal advice.</span>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="side">
+          <div class="panel" id="result">
+            <div class="panelHeader">
+              <p class="panelTitle">Result</p>
+            </div>
+            <div class="panelBody">
+              <div class="resultBox">
+                <div class="resultLabel">Prediction</div>
+                {% if result %}
+                  <p class="bigValue">{{ result.prediction|num }}</p>
+                  <p class="rangeText">
+                    Likely between <strong>{{ result.low|num }}</strong> and <strong>{{ result.high|num }}</strong>
+                    ({{ (coverage * 100)|round|int }}% range)
+                  </p>
+                  <div class="bar" aria-hidden="true">
+                    <div class="barRange" style="left: {{ bar.left }}%; width: {{ bar.right - bar.left }}%;"></div>
+                    <div class="barPoint" style="left: {{ bar.point }}%;"></div>
+                  </div>
+                  <div class="barScale"><span>low</span><span>high</span></div>
+                {% elif error %}
+                  <p class="error">{{ error }}</p>
+                  <ul class="smallList errors">
+                    {% for p in problems %}
+                      <li>{% if p.field %}<code>{{ p.field }}</code>: {% endif %}{{ p.error }}{% if p.fields %}: {{ p.fields|join(", ") }}{% endif %}</li>
+                    {% endfor %}
+                  </ul>
+                {% else %}
+                  <p class="resultValue">Change the values and click Predict.</p>
+                {% endif %}
+              </div>
+              {% if result and result.notes %}
+                <p class="smallTitle">Notes</p>
+                <ul class="smallList notes">
+                  {% for n in result.notes %}<li>{{ n }}</li>{% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panelHeader">
+              <p class="panelTitle">How good is this model?</p>
+            </div>
+            <div class="panelBody">
+              <div class="stats">
+                <div class="stat">
+                  <p class="statValue">{{ metrics.mae|num }}</p>
+                  <p class="statLabel">Typical error (MAE)</p>
+                </div>
+                <div class="stat">
+                  <p class="statValue">{{ metrics.baseline_mae|num }}</p>
+                  <p class="statLabel">Error of a simple guess (median)</p>
+                </div>
+                <div class="stat">
+                  <p class="statValue">{{ metrics.r2|round(3) }}</p>
+                  <p class="statLabel">R² (1.0 is perfect)</p>
+                </div>
+                <div class="stat">
+                  <p class="statValue">{{ metrics.range_coverage|pct }}</p>
+                  <p class="statLabel">True values inside the range (goal {{ metrics.range_coverage_target|pct }})</p>
+                </div>
+              </div>
+              <p class="hint">
+                Measured on {{ metrics.test_rows|num }} test rows that the model never saw.
+                New data that looks different from the training data can give worse results.
+              </p>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panelHeader">
+              <p class="panelTitle">Many rows at once</p>
+            </div>
+            <div class="panelBody">
+              <form action="/predict_batch" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="ui" value="1" />
+                <input type="file" name="file" accept=".csv,text/csv" required aria-label="CSV file" />
+                <div class="actions">
+                  <button class="btn" type="submit">Predict CSV</button>
+                </div>
+              </form>
+              {% if batch_error %}
+                <p class="error">{{ batch_error }}</p>
+                <ul class="smallList errors">
+                  {% for p in batch_problems %}
+                    <li>{% if p.line %}Line {{ p.line }}{% if p.field %}, {% endif %}{% endif %}{% if p.field %}<code>{{ p.field }}</code>{% endif %}{% if p.line or p.field %}: {% endif %}{{ p.error }}{% if p.fields %}: {{ p.fields|join(", ") }}{% endif %}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+              <p class="hint">
+                Upload a CSV with one column per input field. You get the same file back with
+                prediction, low and high columns. Start from the <a href="/template.csv">template CSV</a>.
+              </p>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panelHeader">
+              <p class="panelTitle">Quick checks</p>
+            </div>
+            <div class="panelBody">
+              <ul class="smallList">
+                <li>Health: <a href="/health"><code>/health</code></a></li>
+                <li>Schema and metrics: <a href="/schema"><code>/schema</code></a></li>
+                <li>API expects JSON with key <code>data</code></li>
+                {% if bundle.schema.dropped_columns %}
+                  <li>Columns not used: {% for d in bundle.schema.dropped_columns %}<code>{{ d.name }}</code> ({{ d.reason }}){% if not loop.last %}, {% endif %}{% endfor %}</li>
+                {% endif %}
+              </ul>
+              <p class="hint">Harbor {{ version }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const TYPICAL = {{ typical|tojson }};
+      const NAMES = {{ features|map(attribute="name")|list|tojson }};
+
+      function fieldFor(name){
+        const form = document.getElementById("harborForm");
+        return form ? form.elements.namedItem(name) : null;
+      }
+
+      function fillTypical(){
+        for (const name of NAMES){
+          const el = fieldFor(name);
+          if (el) el.value = TYPICAL[name] === null ? "" : String(TYPICAL[name]);
+        }
+      }
+
+      // On small screens the result is below the form. Show it after Predict.
+      if ({{ (result is defined or error is defined)|tojson }} && window.innerWidth < 980){
+        const box = document.getElementById("result");
+        if (box) box.scrollIntoView();
+      }
+
+      function clearForm(){
+        for (const name of NAMES){
+          const el = fieldFor(name);
+          if (el) el.value = "";
+        }
+      }
+    </script>
+  </body>
+</html>
