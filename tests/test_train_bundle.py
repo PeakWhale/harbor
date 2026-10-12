@@ -89,6 +89,19 @@ def test_rows_with_empty_target_are_skipped(tmp_path):
     assert b.metadata["rows"]["used"] == 290
 
 
+def test_non_negative_looks_at_every_row(tmp_path):
+    from sklearn.model_selection import train_test_split
+
+    df = mixed_frame(300)
+    df["target"] = df["target"].abs()
+    # Put the only negative target in the test rows, which the models never see.
+    _, test_idx = train_test_split(np.arange(len(df)), test_size=0.2, random_state=42)
+    df.loc[test_idx[0], "target"] = -5.0
+    b = train(df, "target", tmp_path / "neg")
+    assert b.target["non_negative"] is False
+    assert b.target["min"] == -5.0
+
+
 def test_unknown_target_suggests_a_column(tmp_path):
     with pytest.raises(TrainingError, match="Did you mean 'repair_hours'"):
         train(EXAMPLE_CSV, "repair_hour", tmp_path / "x")

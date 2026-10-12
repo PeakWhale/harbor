@@ -253,7 +253,8 @@ def train(
         models["low"].predict(X_cal), models["high"].predict(X_cal), y_cal, coverage
     )
 
-    non_negative = bool(y_train.min() >= 0)
+    # Look at every used row, not only the train rows: one negative test row is enough.
+    non_negative = bool(y.min() >= 0)
     test_out = predict_with_range(models, X_test, non_negative)
     scores = regression_metrics(y_test, test_out, float(np.median(y_train)))
     metrics = {
