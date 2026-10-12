@@ -60,7 +60,17 @@ def test_drops_columns_that_cannot_help():
 
 @pytest.mark.parametrize(
     "fmt",
-    ["%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y 0:00", "%b %d, %Y", "%d-%b-%y", "%B %Y", "%Y-%m-%d %H:%M"],
+    [
+        "%Y-%m-%d",
+        "%d-%m-%Y",
+        "%Y/%m/%d",
+        "%d/%m/%Y",
+        "%m/%d/%Y 0:00",
+        "%b %d, %Y",
+        "%d-%b-%y",
+        "%B %Y",
+        "%Y-%m-%d %H:%M",
+    ],
 )
 def test_common_date_formats_are_dropped(fmt):
     df = mixed_frame()
@@ -151,8 +161,9 @@ def test_spreadsheet_number_formats_are_numbers():
         assert f[name]["type"] == "numeric", name
         assert "note" not in f[name], name
     assert f["price"]["max"] == pytest.approx(round(money.max(), 2))
-    frame, notes = check_records([{**{n: 1 for n in f}, "color": "red", "price": "$309,715.32", "count": "2,092",
-                                   "share": "12.5%", "flag": True}], list(f.values()))
+    record = {**{n: 1 for n in f}, "color": "red", "flag": True}
+    record.update({"price": "$309,715.32", "count": "2,092", "share": "12.5%"})
+    frame, _ = check_records([record], list(f.values()))
     assert frame.loc[0, ["price", "count", "share"]].tolist() == [309715.32, 2092.0, 12.5]
 
 

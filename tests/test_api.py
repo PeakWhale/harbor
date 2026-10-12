@@ -170,7 +170,8 @@ def test_batch_keeps_columns_with_the_same_names(client):
     out = pd.read_csv(io.BytesIO(r.data))
     assert (out["notes"] == "my own notes").all() and (out["notes_2"] == "more notes").all()
     assert (out[f"{TARGET}_prediction"] == 1.5).all()
-    assert list(out.columns[df.shape[1]:]) == [f"{TARGET}_prediction_2", f"{TARGET}_low", f"{TARGET}_high", "notes_3"]
+    added = list(out.columns[len(df.columns) :])
+    assert added == [f"{TARGET}_prediction_2", f"{TARGET}_low", f"{TARGET}_high", "notes_3"]
     assert (out[f"{TARGET}_low"] <= out[f"{TARGET}_prediction_2"]).all()
 
 
@@ -253,7 +254,9 @@ def test_upload_limit_can_be_a_fraction(bundle, monkeypatch):
     assert create_app(bundle).config["MAX_CONTENT_LENGTH"] == 512 * 1024
 
 
-@pytest.mark.parametrize("name, expected", [("données été.csv", "donnest"), ("日本.csv", "data"), ("a b-c_d.csv", "ab-c_d")])
+@pytest.mark.parametrize(
+    "name, expected", [("données été.csv", "donnest"), ("日本.csv", "data"), ("a b-c_d.csv", "ab-c_d")]
+)
 def test_batch_file_name_is_safe_for_http_headers(client, name, expected):
     df = pd.read_csv(EXAMPLE_CSV).head(3)
     data = {"file": (io.BytesIO(df.to_csv(index=False).encode()), name)}
